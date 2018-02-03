@@ -1,5 +1,6 @@
-import numpy as np
 from random import random, randint
+
+import numpy as np
 
 
 class QLearner:
@@ -35,13 +36,13 @@ class QLearner:
             simulator.set_agent_pos(simulator.agent_pos, (row, col))
             simulator.agent_pos = [row, col]
 
-            simulator.take_action(self.actions[action])
-            new_state = simulator.agent_pos
             reward = simulator.get_reward()
+            simulator.take_action(self.actions[action])
 
             # Perform TD update
-            self.Q[row][col][action] += learning_rate * (reward + self.discount * max(self.Q[new_state[0]][new_state[1]])
-                                                         - self.Q[row][col][action])
+            self.Q[row][col][action] += learning_rate * (
+            reward + self.discount * max(self.Q[simulator.agent_pos[0]][simulator.agent_pos[1]])
+            - self.Q[row][col][action])
 
             # See if this is better than state's current greedy action
             if self.Q[row][col][action] > self.greedy_v[row][col]:

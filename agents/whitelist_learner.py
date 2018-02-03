@@ -1,7 +1,8 @@
-from .q_learner import QLearner
 from collections import Counter
 from copy import deepcopy
-from random import random, randint
+from random import randint
+
+from .q_learner import QLearner
 
 
 class WhitelistLearner(QLearner):
@@ -39,8 +40,12 @@ class WhitelistLearner(QLearner):
         return differences
 
     def train(self, simulator):
+        def rand_pos():
+            """Return a random position on the game board."""
+            return randint(0, simulator.height - 1), randint(0, simulator.width - 1)
+
         while self.num_samples.min() < self.convergence_bound:
-            row, col = randint(0, simulator.height - 1), randint(0, simulator.width - 1)
+            row, col = rand_pos()
 
             # Choose according to explore/exploit
             action = self.e_greedy_action(row, col)
@@ -51,19 +56,19 @@ class WhitelistLearner(QLearner):
 
             # Go to new simulator state and take action
             simulator.reset()
-            simulator.set_agent_pos(simulator.agent_pos, (row, col))
-            simulator.agent_pos = [row, col]
+            simulator.set_agent_pos(simulator.agent_pos, [row, col])
+            reward = simulator.get_reward()  # reward in state[row][col]
 
             old_state = deepcopy(simulator.state)
             simulator.take_action(self.actions[action])
-            reward = simulator.get_reward()  # find reward differential
-            new_state = simulator.agent_pos
+
             penalty = self.penalty(old_state, simulator.state)
 
             # Perform TD update
-            self.Q[row][col][action] += learning_rate * (
-                reward - penalty + self.discount * max(self.Q[new_state[0]][new_state[1]])
-                - self.Q[row][col][action])
+            self.Q[row][col][action] += learning_rate * (reward - penalty +
+                                                         self.discount * max(
+                                                             self.Q[simulator.agent_pos[0]][simulator.agent_pos[1]])
+                                                         - self.Q[row][col][action])
 
             # See if this is better than state's current greedy action
             if self.Q[row][col][action] > self.greedy_v[row][col]:
