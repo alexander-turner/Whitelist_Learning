@@ -4,16 +4,16 @@ from random import random, randint
 
 class QLearner:
     discount = 0.9  # how much it cares about future rewards
-    epsilon = 0.1  # chance of choosing a random-action
+    epsilon = 0.1  # chance of choosing a random action
     convergence_bound = 100  # minimum number of tries for each (s, a) before terminating
 
     def __init__(self, simulator):
         """Trains using the simulator and e-greedy exploration to determine a greedy policy."""
         self.actions = simulator.get_actions()
         self.num_states = simulator.height * simulator.width
-        self.Q = np.zeros((simulator.height, simulator.width, len(self.actions)))  # TODO check states
+        self.Q = np.zeros((simulator.height, simulator.width, len(self.actions)))  # TODO check dimensionality
         self.greedy_a, self.greedy_v = np.ones((simulator.height, simulator.height), int), \
-                                       np.zeros((simulator.height, simulator.height))  # greedy recordkeeping
+                                       np.zeros((simulator.height, simulator.height))  # greedy record-keeping
         self.num_samples = np.zeros((simulator.height, simulator.width, len(self.actions)), int)
 
         self.train(simulator)  # let's get to work!
@@ -35,12 +35,14 @@ class QLearner:
             self.num_samples[row][col][action] += 1
             learning_rate = 1 / self.num_samples[row][col][action]
 
-            # Take action
-            simulator.reset()  # TODO less?
-            simulator.agent_position = [row, col]
+            # Go to new simulator state and take action
+            simulator.reset()  # TODO how do we track distance to goal?
+            simulator.set_agent_pos(simulator.agent_pos, (row, col))
+            simulator.agent_pos = [row, col]
+
             reward = simulator.get_reward()
-            new_reward = simulator.take_action(self.actions[action])
-            new_state = simulator.agent_position
+            simulator.take_action(self.actions[action])
+            new_state = simulator.agent_pos
 
             # Perform TD update
             self.Q[row][col][action] += learning_rate * (reward + self.discount * max(self.Q[new_state[0]][new_state[1]])
@@ -51,4 +53,4 @@ class QLearner:
                 self.greedy_a[row][col], self.greedy_v[row][col] = action, self.Q[row][col][action]
 
     def choose_action(self, state):
-        return self.greedy_a[state.agent_position[0]][state.agent_position[1]]
+        return self.actions[self.greedy_a[state.agent_pos[0]][state.agent_pos[1]]]
