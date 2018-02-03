@@ -40,12 +40,8 @@ class WhitelistLearner(QLearner):
         return differences
 
     def train(self, simulator):
-        def rand_pos():
-            """Return a random position on the game board."""
-            return randint(0, simulator.height - 1), randint(0, simulator.width - 1)
-
         while self.num_samples.min() < self.convergence_bound:
-            row, col = rand_pos()
+            row, col = randint(0, simulator.height - 1), randint(0, simulator.width - 1)
 
             # Choose according to explore/exploit
             action = self.e_greedy_action(row, col)
