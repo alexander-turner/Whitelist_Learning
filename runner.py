@@ -1,8 +1,11 @@
-from random import randint
+from agents.q_learner import QLearner
 from environments.vases import VaseWorld
 
-for _ in range(10):
-    state = VaseWorld(4, 4)
-    for _ in range(20):
-        print(state.take_action(state.get_actions()[randint(0, 3)]))
+state = VaseWorld(4, 4)
+agent = QLearner(state)
+while True:
+    while not state.is_terminal():
+        state.take_action(agent.choose_action(state))
         print(state)
+    state.reset()
+    print('RESET')
