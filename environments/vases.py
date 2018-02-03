@@ -30,10 +30,12 @@ class VaseWorld:
         # Randomly place goal state
         goal_ind = random.randint(1, self.width * self.height - 1)  # make sure it isn't on top of agent
         self.state[goal_ind // self.width][goal_ind % self.width] = self.chars['goal']
+        '''
         self.state = [['A_', 'v', 'v', 'G'],  # toy problem where normal RL will smash vases
                       ['_', 'v', 'v', '_'],
                       ['_', 'v', 'v', '_'],
                       ['_', '_', '_', '_']]
+        '''
         self.original_state = deepcopy(self.state)
 
         # Reset time counter

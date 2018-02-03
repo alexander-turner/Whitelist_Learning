@@ -6,7 +6,7 @@ from random import random, randint
 
 class WhitelistLearner(QLearner):
     """A cautious agent that tries not to change the world too much (unlike its creator)."""
-    unknown_cost = 50  # cost to each unknown change effected to the environment
+    unknown_cost = 50  # cost of each unknown change effected to the environment
 
     def __init__(self, examples, simulator):
         """Takes a flattened list of observed tile transitions during training episodes and a simulator."""
