@@ -1,14 +1,21 @@
+import time
 from agents.q_learner import QLearner
 from agents.whitelist_learner import WhitelistLearner
-from environments.vases import VaseWorld
+from environments.vase_world.vases import VaseWorld
+
+# This example encapsulates all the whitelist learner needs
+examples = [[[['A_', '_', 'G']],  # 3 time steps of a 1x3 VaseWorld - look ma, no vase!
+             [['_', 'A_', 'G']],
+             [['_', '_', 'AG']]]]
 
 while True:
     state = VaseWorld(4, 4, .2)
-    q, whitelist = QLearner(state), WhitelistLearner([[('A_', '_'), ('_', 'A_'), ('G', 'AG')]], state)
+    q, whitelist = QLearner(state), WhitelistLearner(examples, state)
     for agent in (q, whitelist):
-        print(state)
+        state.render()
         while not state.is_terminal():
             state.take_action(agent.choose_action(state))
-            print(state)
+            state.render()
+            time.sleep(.2)
+        time.sleep(.5)
         state.reset()
-        print('RESET')

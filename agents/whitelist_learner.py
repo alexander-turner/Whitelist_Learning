@@ -5,16 +5,18 @@ from random import random, randint
 
 
 class WhitelistLearner(QLearner):
-    """A cautious agent that tries not to change the world too much (unlike its creator)."""
+    """A cautious agent that tries not to change the world too much in unknown ways."""
     unknown_cost = 100  # cost of each unknown change effected to the environment TODO double-counting transitions?
 
     def __init__(self, examples, simulator):
-        """Takes a flattened list of observed tile transitions during training episodes and a simulator."""
+        """Takes a series of state representations (training set) and a simulator."""
         # whitelist[char1, char2] := number of times char1 -> char2 observed during training
         self.whitelist = Counter()
         for example in examples:
-            for char1, char2 in example:  # each observed transition
-                self.whitelist[char1, char2] += 1
+            for ind, state_b in enumerate(example[1:], start=1):  # for each of the t-1 transitory time slices
+                state_a = example[ind-1]
+                for char1, char2 in self.diff(state_a, state_b):  # each observed transition
+                    self.whitelist[char1, char2] += 1
 
         super().__init__(simulator)  # do normal training
 

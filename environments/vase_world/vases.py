@@ -1,3 +1,5 @@
+import os
+import pygame
 import random
 from copy import deepcopy
 
@@ -9,12 +11,15 @@ class VaseWorld:
     time_cost = -1
     goal_reward = 50
 
-    def __init__(self, width, height, vase_chance=.3):
+    def __init__(self, width, height, vase_chance=.3, window_name=''):
         self.width, self.height = width, height
+        self.resources = {}
         if not 0 <= vase_chance <= 1:
             raise Exception('Chance of a square containing a vase must be in [0, 1].')
         self.vase_chance = vase_chance  # how likely a given square is to contain a vase
+        self.window_name = window_name
         self.state = [[''] * self.height for _ in range(self.width)]
+
         self.regenerate()
 
     def regenerate(self):
@@ -30,12 +35,12 @@ class VaseWorld:
         # Randomly place goal state
         goal_ind = random.randint(1, self.width * self.height - 1)  # make sure it isn't on top of agent
         self.state[goal_ind // self.width][goal_ind % self.width] = self.chars['goal']
-        '''
+
         self.state = [['A_', 'v', 'v', 'G'],  # toy problem where normal RL will smash vases
                       ['_', 'v', 'v', '_'],
                       ['_', 'v', 'v', '_'],
                       ['_', '_', '_', '_']]
-        '''
+
         self.original_state = deepcopy(self.state)
 
         # Reset time counter
@@ -95,6 +100,45 @@ class VaseWorld:
         self.set_agent_pos(old_pos, self.agent_pos)
 
         return self.get_reward()
+
+    def render(self):
+        """Render the game board, creating a tkinter window if needed."""
+        if not hasattr(self, 'screen'):
+            pygame.init()
+            self.tile_size = 50
+            self.window_width, self.window_height = self.tile_size * self.width, self.tile_size * self.height
+            self.screen = pygame.display.set_mode((self.window_width, self.window_height))
+
+            pygame.display.set_caption(self.window_name)
+            if len(self.resources) == 0:
+                self.load_resources("environments\\vase_world\\resources")
+        pygame.event.clear()  # allows for pausing and debugging without losing rendering capability
+
+        for row in range(self.height):
+            for col in range(self.width):
+                # Color tile according to whether it's normal or goal
+                bg_color = (0, 150, 0) if self.chars['goal'] in self.state[row][col] else (200, 200, 200)
+                x, y = col * self.tile_size, row * self.tile_size
+                pygame.draw.rect(self.screen, bg_color, (x, y, self.tile_size, self.tile_size))
+
+                # Load the image, scale it, and put it on the correct tile
+                if self.state[row][col] not in (self.chars['empty'], self.chars['goal']):
+                    image = self.resources[self.state[row][col][0]]  # show what's on top
+                    piece_rect = image.get_rect()
+                    piece_rect.move_ip(self.tile_size * col,  # TODO right?
+                                       self.tile_size * row)  # move in-place
+
+                    self.screen.blit(image, piece_rect)  # draw the tile
+
+        pygame.display.update()  # update visible display
+
+    def load_resources(self, path):
+        """Load the requisite images for chess rendering from the given path."""
+        for char in self.chars.values():  # load each data type
+            if char in (self.chars['goal'], self.chars['empty']):  # just draw background as gray and green
+                continue
+            image = pygame.image.load_extended(os.path.join(path, char + '.png'))
+            self.resources[char] = pygame.transform.scale(image, (self.tile_size, self.tile_size))
 
     def __hash__(self):
         return hash(''.join([''.join(row) for row in self.state]))
