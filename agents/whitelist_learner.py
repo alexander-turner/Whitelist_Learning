@@ -6,7 +6,7 @@ from random import random, randint
 
 class WhitelistLearner(QLearner):
     """A cautious agent that tries not to change the world too much (unlike its creator)."""
-    unknown_cost = 50  # cost of each unknown change effected to the environment
+    unknown_cost = 100  # cost of each unknown change effected to the environment TODO double-counting transitions?
 
     def __init__(self, examples, simulator):
         """Takes a flattened list of observed tile transitions during training episodes and a simulator."""
@@ -18,7 +18,7 @@ class WhitelistLearner(QLearner):
 
         super().__init__(simulator)  # do normal training
 
-    def grade_transition(self, state_a, state_b):
+    def penalty(self, state_a, state_b):
         """Calculate the penalty incurred by the transition from state_a to state_b."""
         penalty = 0
         for difference in self.diff(state_a, state_b):
@@ -41,32 +41,27 @@ class WhitelistLearner(QLearner):
             row, col = randint(0, simulator.height - 1), randint(0, simulator.width - 1)
 
             # Choose according to explore/exploit
-            if random() < self.epsilon:
-                action = randint(0, len(self.actions) - 1)
-                while action == self.greedy_a[row][col]:  # make sure we don't choose greedy action
-                    action = randint(0, len(self.actions) - 1)
-            else:
-                action = self.greedy_a[row][col]
+            action = self.e_greedy_action(row, col)
 
             # Update sample count and learning rate
             self.num_samples[row][col][action] += 1
             learning_rate = 1 / self.num_samples[row][col][action]
 
             # Go to new simulator state and take action
-            simulator.reset()  # TODO how do we track distance to goal?
+            simulator.reset()
             simulator.set_agent_pos(simulator.agent_pos, (row, col))
             simulator.agent_pos = [row, col]
 
-            reward = simulator.get_reward()
             old_state = deepcopy(simulator.state)
             simulator.take_action(self.actions[action])
+            reward = simulator.get_reward()  # find reward differential
             new_state = simulator.agent_pos
-            penalty = self.grade_transition(old_state, simulator.state)
+            penalty = self.penalty(old_state, simulator.state)
 
             # Perform TD update
             self.Q[row][col][action] += learning_rate * (
-                reward + self.discount * max(self.Q[new_state[0]][new_state[1]])
-                - self.Q[row][col][action] - penalty)
+                reward - penalty + self.discount * max(self.Q[new_state[0]][new_state[1]])
+                - self.Q[row][col][action])
 
             # See if this is better than state's current greedy action
             if self.Q[row][col][action] > self.greedy_v[row][col]:

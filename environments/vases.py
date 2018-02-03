@@ -67,7 +67,7 @@ class VaseWorld:
         return sum(x.count(self.chars['mess']) for x in self.state)
 
     def get_reward(self):
-        return self.goal_reward + self.time_step * self.time_cost if self.is_terminal() else 0
+        return self.time_cost + self.goal_reward if self.is_terminal() else self.time_cost
 
     def is_terminal(self):
         return self.chars['goal'] in self.state[self.agent_pos[0]][self.agent_pos[1]]
