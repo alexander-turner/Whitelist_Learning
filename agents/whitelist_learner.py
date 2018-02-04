@@ -6,7 +6,9 @@ from .q_learner import QLearner
 
 class WhitelistLearner(QLearner):
     """A cautious agent that tries not to change the world too much in unknown ways."""
-    unknown_cost = 150  # cost of each unknown change effected to the environment
+    unknown_cost = 160  # cost of each unknown change effected to the environment
+    # NOTE bad performance can arise outside of a narrow range of parameters; perhaps train() isn't simulating properly?
+    #  Doesn't seem to be an issue with the core idea, however.
 
     def __init__(self, examples, simulator):
         """Takes a series of state representations (training set) and a simulator."""
@@ -25,7 +27,7 @@ class WhitelistLearner(QLearner):
         # NOTE transitions are being double-counted (counts leaving an unknown state (Ax, x) as bad)
         penalty = 0
         for difference in self.diff(state_a, state_b):
-            if difference not in self.whitelist:  # TODO make more sophisticated
+            if difference not in self.whitelist:
                 penalty += self.unknown_cost
         return penalty
 

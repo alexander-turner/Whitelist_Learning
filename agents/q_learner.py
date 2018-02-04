@@ -6,13 +6,13 @@ import numpy as np
 class QLearner:
     discount = 0.9  # how much it cares about future rewards
     epsilon = 0.1  # chance of choosing a random action
-    convergence_bound = 300  # minimum number of tries for each (s, a) before terminating
+    convergence_bound = 350  # minimum number of tries for each (s, a) before terminating
 
     def __init__(self, simulator):
         """Trains using the simulator and e-greedy exploration to determine a greedy policy."""
         self.actions = simulator.get_actions()
         self.num_states = simulator.height * simulator.width
-        self.Q = np.zeros((simulator.height, simulator.width, len(self.actions)))  # TODO check dimensionality
+        self.Q = np.zeros((simulator.height, simulator.width, len(self.actions)))
         self.greedy_a, self.greedy_v = np.zeros((simulator.height, simulator.width), int), \
                                        np.full((simulator.height, simulator.width), float('-inf'))  # greedy record-keeping
 
