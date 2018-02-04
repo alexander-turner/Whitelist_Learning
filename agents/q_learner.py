@@ -6,7 +6,7 @@ import numpy as np
 class QLearner:
     discount = 0.9  # how much it cares about future rewards
     epsilon = 0.1  # chance of choosing a random action
-    convergence_bound = 200  # minimum number of tries for each (s, a) before terminating
+    convergence_bound = 300  # minimum number of tries for each (s, a) before terminating
 
     def __init__(self, simulator):
         """Trains using the simulator and e-greedy exploration to determine a greedy policy."""

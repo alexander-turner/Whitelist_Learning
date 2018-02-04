@@ -70,9 +70,6 @@ class VaseWorld:
         """If an agent tries to move into a wall, nothing happens."""
         return 'up', 'left', 'right', 'down'
 
-    def get_agent_pos(self):
-        return self.agent_pos
-
     def set_agent_pos(self, old_pos, new_pos):
         # Remove agent from current location
         self.state[old_pos[0]][old_pos[1]] = self.state[old_pos[0]][old_pos[1]][1:]
@@ -83,9 +80,6 @@ class VaseWorld:
         self.state[new_pos[0]][new_pos[1]] = self.chars['agent'] + self.state[new_pos[0]][new_pos[1]]
         self.agent_pos = new_pos
 
-    def get_vases_broken(self):
-        return sum(x.count(self.chars['mess']) for x in self.state)
-
     def get_reward(self):
         return self.time_cost + self.goal_reward if self.is_terminal() else self.time_cost
 
@@ -94,8 +88,7 @@ class VaseWorld:
 
     def take_action(self, action):
         """Take the action, breaking vases as necessary and returning any award achieved."""
-        # Keep the clock ticking
-        self.time_step += 1
+        self.time_step += 1  # keep the clock ticking
 
         # Handle agent updating
         old_pos = self.agent_pos.copy()
@@ -157,9 +150,6 @@ class VaseWorld:
         for char in ('Q', 'W'):  # load agent types
             image = pygame.image.load_extended(os.path.join(path, char + '.png'))
             self.resources[char] = pygame.transform.scale(image, (self.tile_size, self.tile_size))
-
-    def __hash__(self):
-        return hash(''.join([''.join(row) for row in self.state]))
 
     def __str__(self):
         rep = ''
