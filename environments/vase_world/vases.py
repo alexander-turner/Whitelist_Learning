@@ -126,11 +126,10 @@ class VaseWorld:
 
         for row in range(self.height):
             for col in range(self.width):
-                # Color tile according to whether it's normal or goal
                 x, y = col * self.tile_size, row * self.tile_size
                 pygame.draw.rect(self.screen, (200, 200, 200), (x, y, self.tile_size, self.tile_size))
 
-                if self.chars['goal'] in self.state[row][col]:
+                if self.chars['goal'] in self.state[row][col]:  # special goal outline
                     pygame.draw.rect(self.screen, (0, 180, 0), (x, y, self.tile_size, self.tile_size),
                                      self.tile_size // 10)
 
