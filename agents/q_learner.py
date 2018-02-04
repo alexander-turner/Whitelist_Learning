@@ -19,7 +19,7 @@ class QLearner:
         self.num_samples = np.zeros((simulator.height, simulator.width, len(self.actions)), int)
 
         self.train(simulator)  # let's get to work!
-        simulator.reset()  # clean up after ourselves-*
+        simulator.reset()  # clean up after ourselves
 
     def train(self, simulator):
         while self.num_samples.min() < self.convergence_bound:
@@ -53,7 +53,7 @@ class QLearner:
         action = self.greedy_a[row][col]
         if random() < self.epsilon:
             action = randint(0, len(self.actions) - 1)
-            while action == self.greedy_a[row][col]:  # make sure we don't choose greedy action
+            while action == self.greedy_a[row][col]:  # make sure we don't choose the greedy action
                 action = randint(0, len(self.actions) - 1)
         return action
 
