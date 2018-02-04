@@ -13,19 +13,25 @@ class VaseWorld:
              'mess': 'x'}  # other
     obstacles = (chars['vase'], chars['crate'])
     time_cost = -1
-    goal_reward = 50
+    goal_reward = 60
     is_whitelist = False  # for rendering purposes
 
-    def __init__(self, width, height, obstacle_chance=.3):
-        self.width, self.height = width, height
-        self.resources = {}
+    def __init__(self, width=4, height=4, state=None, obstacle_chance=.3):
         if not 0 <= obstacle_chance <= 1:
             raise Exception('Chance of a square containing an obstacle must be in [0, 1].')
         self.obstacle_chance = obstacle_chance  # how likely any given square is to contain an obstacle
 
         self.agent_pos = [0, 0]
         self.time_step = 0
-        self.regenerate()
+        self.resources = {}
+
+        if state:
+            self.width, self.height = len(state[0]), len(state)
+            self.original_state = [row.copy() for row in state]
+            self.state = [row.copy() for row in state]
+        else:
+            self.width, self.height = width, height
+            self.regenerate()
 
     def regenerate(self):
         """Initialize a random VaseWorld."""
@@ -47,11 +53,6 @@ class VaseWorld:
         # Randomly place goal state
         goal_ind = random.randint(1, self.width * self.height - 1)  # make sure it isn't on top of agent
         self.state[goal_ind // self.width][goal_ind % self.width] = self.chars['goal']
-
-        self.state = [['A_', 'v', 'v', 'G'],  # toy problem where normal RL will smash vases
-                      ['_', 'v', 'v', '_'],
-                      ['_', 'v', 'v', '_'],
-                      ['_', '_', '_', '_']]
 
         self.original_state = [row.copy() for row in self.state]
 

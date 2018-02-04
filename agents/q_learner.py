@@ -6,15 +6,15 @@ import numpy as np
 class QLearner:
     discount = 0.9  # how much it cares about future rewards
     epsilon = 0.1  # chance of choosing a random action
-    convergence_bound = 100  # minimum number of tries for each (s, a) before terminating
+    convergence_bound = 200  # minimum number of tries for each (s, a) before terminating
 
     def __init__(self, simulator):
         """Trains using the simulator and e-greedy exploration to determine a greedy policy."""
         self.actions = simulator.get_actions()
         self.num_states = simulator.height * simulator.width
         self.Q = np.zeros((simulator.height, simulator.width, len(self.actions)))  # TODO check dimensionality
-        self.greedy_a, self.greedy_v = np.ones((simulator.height, simulator.height), int), \
-                                       np.zeros((simulator.height, simulator.height))  # greedy record-keeping
+        self.greedy_a, self.greedy_v = np.ones((simulator.height, simulator.width), int), \
+                                       np.zeros((simulator.height, simulator.width))  # greedy record-keeping
         self.greedy_v.fill(float('-inf'))
         self.num_samples = np.zeros((simulator.height, simulator.width, len(self.actions)), int)
 
@@ -40,9 +40,9 @@ class QLearner:
             simulator.take_action(self.actions[action])
 
             # Perform TD update
-            self.Q[row][col][action] += learning_rate * (
-            reward + self.discount * max(self.Q[simulator.agent_pos[0]][simulator.agent_pos[1]])
-            - self.Q[row][col][action])
+            self.Q[row][col][action] += learning_rate * (reward +
+                                                         self.discount * max(self.Q[simulator.agent_pos[0]][simulator.agent_pos[1]])
+                                                         - self.Q[row][col][action])
 
             # See if this is better than state's current greedy action
             if self.Q[row][col][action] > self.greedy_v[row][col]:

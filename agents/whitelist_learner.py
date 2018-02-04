@@ -6,7 +6,7 @@ from .q_learner import QLearner
 
 class WhitelistLearner(QLearner):
     """A cautious agent that tries not to change the world too much in unknown ways."""
-    unknown_cost = 100  # cost of each unknown change effected to the environment TODO double-counting transitions?
+    unknown_cost = 150  # cost of each unknown change effected to the environment
 
     def __init__(self, examples, simulator):
         """Takes a series of state representations (training set) and a simulator."""
@@ -22,6 +22,7 @@ class WhitelistLearner(QLearner):
 
     def penalty(self, state_a, state_b):
         """Calculate the penalty incurred by the transition from state_a to state_b."""
+        # NOTE transitions are being double-counted (counts leaving an unknown state (Ax, x) as bad)
         penalty = 0
         for difference in self.diff(state_a, state_b):
             if difference not in self.whitelist:  # TODO make more sophisticated
@@ -61,8 +62,7 @@ class WhitelistLearner(QLearner):
 
             # Perform TD update
             self.Q[row][col][action] += learning_rate * (reward - penalty +
-                                                         self.discount * max(
-                                                             self.Q[simulator.agent_pos[0]][simulator.agent_pos[1]])
+                                                         self.discount * max(self.Q[simulator.agent_pos[0]][simulator.agent_pos[1]])
                                                          - self.Q[row][col][action])
 
             # See if this is better than state's current greedy action
