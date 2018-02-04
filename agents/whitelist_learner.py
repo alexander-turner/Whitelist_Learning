@@ -1,5 +1,4 @@
 from collections import Counter
-from copy import deepcopy
 from random import randint
 
 from .q_learner import QLearner
@@ -55,7 +54,7 @@ class WhitelistLearner(QLearner):
             simulator.set_agent_pos(simulator.agent_pos, [row, col])
             reward = simulator.get_reward()  # reward in state[row][col]
 
-            old_state = deepcopy(simulator.state)
+            old_state = [row.copy() for row in simulator.state]
             simulator.take_action(self.actions[action])
 
             penalty = self.penalty(old_state, simulator.state)

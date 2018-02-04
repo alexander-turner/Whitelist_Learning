@@ -19,7 +19,7 @@ class QLearner:
         self.num_samples = np.zeros((simulator.height, simulator.width, len(self.actions)), int)
 
         self.train(simulator)  # let's get to work!
-        simulator.reset()  # clean up after ourselves
+        simulator.reset()  # clean up after ourselves-*
 
     def train(self, simulator):
         while self.num_samples.min() < self.convergence_bound:

@@ -1,4 +1,5 @@
 import time
+
 from agents.q_learner import QLearner
 from agents.whitelist_learner import WhitelistLearner
 from environments.vase_world.vases import VaseWorld
@@ -12,10 +13,11 @@ while True:
     state = VaseWorld(4, 4, .2)
     q, whitelist = QLearner(state), WhitelistLearner(examples, state)
     for agent in (q, whitelist):
+        state.is_whitelist = isinstance(agent, WhitelistLearner)
         state.render()
         while not state.is_terminal():
+            time.sleep(.1)
             state.take_action(agent.choose_action(state))
             state.render()
-            time.sleep(.2)
-        time.sleep(.5)
+        time.sleep(.3)
         state.reset()

@@ -1,6 +1,5 @@
 import os
 import random
-from copy import deepcopy
 
 import pygame
 
@@ -15,15 +14,17 @@ class VaseWorld:
     obstacles = (chars['vase'], chars['crate'])
     time_cost = -1
     goal_reward = 50
+    is_whitelist = False  # for rendering purposes
 
-    def __init__(self, width, height, obstacle_chance=.3, window_name=''):
+    def __init__(self, width, height, obstacle_chance=.3):
         self.width, self.height = width, height
         self.resources = {}
         if not 0 <= obstacle_chance <= 1:
             raise Exception('Chance of a square containing an obstacle must be in [0, 1].')
         self.obstacle_chance = obstacle_chance  # how likely any given square is to contain an obstacle
-        self.window_name = window_name
 
+        self.agent_pos = [0, 0]
+        self.time_step = 0
         self.regenerate()
 
     def regenerate(self):
@@ -52,14 +53,14 @@ class VaseWorld:
                       ['_', 'v', 'v', '_'],
                       ['_', '_', '_', '_']]
 
-        self.original_state = deepcopy(self.state)
+        self.original_state = [row.copy() for row in self.state]
 
         # Reset time counter
         self.time_step = 0
 
     def reset(self):
         """Reset the current variation."""
-        self.state = deepcopy(self.original_state)
+        self.state = [row.copy() for row in self.original_state]
         self.agent_pos = [0, 0]
         self.time_step = 0
 
@@ -118,7 +119,7 @@ class VaseWorld:
             self.window_width, self.window_height = self.tile_size * self.width, self.tile_size * self.height
             self.screen = pygame.display.set_mode((self.window_width, self.window_height))
 
-            pygame.display.set_caption(self.window_name)
+            pygame.display.set_caption('VaseWorld')
             if len(self.resources) == 0:
                 self.load_resources("environments\\vase_world\\resources")
         pygame.event.clear()  # allows for pausing and debugging without losing rendering capability
@@ -126,13 +127,19 @@ class VaseWorld:
         for row in range(self.height):
             for col in range(self.width):
                 # Color tile according to whether it's normal or goal
-                bg_color = (0, 150, 0) if self.chars['goal'] in self.state[row][col] else (200, 200, 200)
                 x, y = col * self.tile_size, row * self.tile_size
-                pygame.draw.rect(self.screen, bg_color, (x, y, self.tile_size, self.tile_size))
+                pygame.draw.rect(self.screen, (200, 200, 200), (x, y, self.tile_size, self.tile_size))
+
+                if self.chars['goal'] in self.state[row][col]:
+                    pygame.draw.rect(self.screen, (0, 180, 0), (x, y, self.tile_size, self.tile_size),
+                                     self.tile_size // 10)
 
                 # Load the image, scale it, and put it on the correct tile
                 if self.state[row][col] not in (self.chars['empty'], self.chars['goal']):
-                    image = self.resources[self.state[row][col][0]]  # show what's on top
+                    if self.chars['agent'] in self.state[row][col]:
+                        image = self.resources['W' if self.is_whitelist else 'Q']
+                    else:
+                        image = self.resources[self.state[row][col][0]]  # show what's on top
                     piece_rect = image.get_rect()
                     piece_rect.move_ip(self.tile_size * col, self.tile_size * row)  # move in-place
                     self.screen.blit(image, piece_rect)  # draw the tile
@@ -140,10 +147,14 @@ class VaseWorld:
         pygame.display.update()  # update visible display
 
     def load_resources(self, path):
-        """Load the requisite images for chess rendering from the given path."""
+        """Load images from the given path."""
         for char in self.chars.values():  # load each data type
             if char in (self.chars['goal'], self.chars['empty']):  # just draw background as gray and green
                 continue
+            image = pygame.image.load_extended(os.path.join(path, char + '.png'))
+            self.resources[char] = pygame.transform.scale(image, (self.tile_size, self.tile_size))
+
+        for char in ('Q', 'W'):  # load agent types
             image = pygame.image.load_extended(os.path.join(path, char + '.png'))
             self.resources[char] = pygame.transform.scale(image, (self.tile_size, self.tile_size))
 
