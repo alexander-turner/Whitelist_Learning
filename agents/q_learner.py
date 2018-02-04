@@ -13,9 +13,9 @@ class QLearner:
         self.actions = simulator.get_actions()
         self.num_states = simulator.height * simulator.width
         self.Q = np.zeros((simulator.height, simulator.width, len(self.actions)))  # TODO check dimensionality
-        self.greedy_a, self.greedy_v = np.ones((simulator.height, simulator.width), int), \
-                                       np.zeros((simulator.height, simulator.width))  # greedy record-keeping
-        self.greedy_v.fill(float('-inf'))
+        self.greedy_a, self.greedy_v = np.zeros((simulator.height, simulator.width), int), \
+                                       np.full((simulator.height, simulator.width), float('-inf'))  # greedy record-keeping
+
         self.num_samples = np.zeros((simulator.height, simulator.width, len(self.actions)), int)
 
         self.train(simulator)  # let's get to work!
