@@ -21,52 +21,56 @@ class VaseWorld:
             raise Exception('Chance of a square containing an obstacle must be in [0, 1].')
         self.obstacle_chance = obstacle_chance  # how likely any given square is to contain an obstacle
 
-        self.agent_pos = [0, 0]
+        self.agent_pos, self.goal_pos = None, None
         self.time_step = 0
         self.resources = {}
 
         if state:
             self.width, self.height = len(state[0]), len(state)
-            self.original_state = [row.copy() for row in state]  # copy so original blueprint remains
+            self.state = [row.copy() for row in state]  # copy so original blueprint remains
 
             # Mark goal square
-            for r, row in enumerate(state):
-                for c, val in enumerate(row):
-                    if val == 'G':  # specify goal state with G
-                        self.goal_pos = [r, c]
-                        self.original_state[r][c] = '_'
-                        break
-            self.state = [row.copy() for row in self.original_state]
+            self.goal_pos = self.find_char('G')
+            self.original_state[self.goal_pos[0]][self.goal_pos[1]] = self.chars['empty']
+            self.agent_pos = self.find_char(self.chars['agent'])
+
+            self.original_state = [row.copy() for row in self.state]
         else:
             self.width, self.height = width, height
             self.regenerate()
 
     def regenerate(self):
         """Initialize a random VaseWorld."""
-        self.state = [['_'] * self.width for _ in range(self.height)]
+        self.state = [[self.chars['empty']] * self.width for _ in range(self.height)]
 
         for row in range(self.height):
             for col in range(self.width):
-                # Determine what the square will contain
-                if random.random() <= self.obstacle_chance:
+                if random.random() <= self.obstacle_chance:  # place obstacles randomly
                     self.state[row][col] = self.obstacles[random.randint(0, len(self.obstacles) - 1)]
 
         # Agent always in top-left
-        self.state[0][0] = self.chars['agent'] + '_'  # place the agent
-        self.agent_pos = [0, 0]
+        self.agent_pos = self.find_char(self.chars['empty'], exclusive=True)
+        self.state[self.agent_pos[0]][self.agent_pos[1]] = self.chars['agent'] + self.chars['empty']  # place the agent
 
-        # Randomly place goal state
-        goal_ind = random.randint(1, self.width * self.height - 1)  # make sure it isn't on top of agent
-        self.goal_pos = [goal_ind // self.width, goal_ind % self.width]
-        self.original_state = [row.copy() for row in self.state]
+        self.goal_pos = self.find_char(self.chars['empty'], exclusive=True)  # randomly place goal state
 
         # Reset time counter
         self.time_step = 0
+        self.original_state = [row.copy() for row in self.state]
+
+    def find_char(self, char, exclusive=False):
+        """Returns the coordinates of a random square containing char (ASSUMES char is in state)."""
+        while True:
+            ind = random.randint(0, self.width * self.height - 1)
+            pos = [ind // self.width, ind % self.width]
+            if pos != self.goal_pos and self.state[pos[0]][pos[1]] == char or \
+                    (not exclusive and char in self.state[pos[0]][pos[1]]):
+                return pos
 
     def reset(self):
         """Reset the current variation."""
         self.state = [row.copy() for row in self.original_state]
-        self.agent_pos = [0, 0]
+        self.agent_pos = self.find_char(self.chars['agent'])
         self.time_step = 0
 
     @staticmethod
