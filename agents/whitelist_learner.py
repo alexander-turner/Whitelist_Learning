@@ -6,9 +6,7 @@ from .q_learner import QLearner
 
 class WhitelistLearner(QLearner):
     """A cautious agent that tries not to change the world too much in unknown ways."""
-    unknown_cost = 200  # cost of each unknown change effected to the environment
-    # NOTE bad performance can arise outside of a narrow range of parameters; perhaps train() isn't simulating properly?
-    #  Doesn't seem to be an issue with the core idea, however.
+    unknown_cost = 500  # cost of each unknown change effected to the environment
 
     def __init__(self, examples, simulator):
         """Takes a series of state representations (training set) and a simulator."""
@@ -45,7 +43,7 @@ class WhitelistLearner(QLearner):
             row, col = randint(0, simulator.height - 1), randint(0, simulator.width - 1)
 
             # Go to new simulator state and take action
-            simulator.reset()
+            #simulator.reset()
             simulator.set_agent_pos(simulator.agent_pos, [row, col])
             reward = simulator.get_reward()  # reward in state[row][col]
             old_state = [row.copy() for row in simulator.state]

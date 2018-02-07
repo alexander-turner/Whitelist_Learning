@@ -9,11 +9,13 @@ from environments.vase_world.vases import VaseWorld
 
 examples = [[[['A_', '_']],  # 2 time steps of a 1x2 VaseWorld is all the whitelist learner needs
              [['_', 'A_']]]]
+
 broken = Counter()
 
 
-def run(state):
+def run(state, level):
     """Run the given VaseWorld state for both learners."""
+    level += 1  # how many levels have we ran?
     for agent in (QLearner(state), WhitelistLearner(examples, state)):
         state.is_whitelist = isinstance(agent, WhitelistLearner)
         state.render()
@@ -29,12 +31,15 @@ def run(state):
             time.sleep(.5)
         state.reset()
     print('\r', end='')
-    print(broken, end='', flush=True)
+    print('Round {}. {}'.format(level, broken), end='', flush=True)
+    return level
 
 
+level = 0
 for challenge in challenges:  # curated showcase
-    run(VaseWorld(state=challenge))
+    level = run(VaseWorld(state=challenge), level)
 
 while True:  # random showcase
-    run(VaseWorld(width=randint(3, 5), height=randint(3, 5),
-                  obstacle_chance=(random() + 1)/4))  # in [0.25, 0.75]
+    level = run(VaseWorld(width=randint(3, 5), height=randint(3, 5),
+                          obstacle_chance=(random() + 1)/4),  # in [0.25, 0.75]
+                level)

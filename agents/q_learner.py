@@ -26,8 +26,7 @@ class QLearner:
             row, col = randint(0, simulator.height - 1), randint(0, simulator.width - 1)
 
             # Go to new simulator state and take action
-            simulator.set_agent_pos(simulator.agent_pos, (row, col))
-            simulator.agent_pos = [row, col]
+            simulator.set_agent_pos(simulator.agent_pos, [row, col])
             reward = simulator.get_reward()
 
             action = self.e_greedy_action(row, col)  # choose according to explore/exploit
