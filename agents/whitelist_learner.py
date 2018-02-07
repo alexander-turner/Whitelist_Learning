@@ -6,7 +6,7 @@ from .q_learner import QLearner
 
 class WhitelistLearner(QLearner):
     """A cautious agent that tries not to change the world too much in unknown ways."""
-    unknown_cost = 160  # cost of each unknown change effected to the environment
+    unknown_cost = 200  # cost of each unknown change effected to the environment
     # NOTE bad performance can arise outside of a narrow range of parameters; perhaps train() isn't simulating properly?
     #  Doesn't seem to be an issue with the core idea, however.
 

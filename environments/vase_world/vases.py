@@ -31,7 +31,7 @@ class VaseWorld:
 
             # Mark goal square
             self.goal_pos = self.find_char('G')
-            self.original_state[self.goal_pos[0]][self.goal_pos[1]] = self.chars['empty']
+            self.state[self.goal_pos[0]][self.goal_pos[1]] = self.chars['empty']
             self.agent_pos = self.find_char(self.chars['agent'])
 
             self.original_state = [row.copy() for row in self.state]

@@ -1,9 +1,15 @@
 import time
+from collections import Counter
 from random import random, randint
 
 from agents.q_learner import QLearner
 from agents.whitelist_learner import WhitelistLearner
+from environments.vase_world.challenges import challenges
 from environments.vase_world.vases import VaseWorld
+
+examples = [[[['A_', '_']],  # 2 time steps of a 1x2 VaseWorld is all the whitelist learner needs
+             [['_', 'A_']]]]
+broken = Counter()
 
 
 def run(state):
@@ -18,17 +24,16 @@ def run(state):
             state.take_action(agent.choose_action(state))
             state.render()
 
-        # Don't sleep if we're about to train
-        if not isinstance(agent, WhitelistLearner):
+        broken[agent.__class__] += sum([sum([1 for c in row if c == state.chars['mess']]) for row in state.state])
+        if not isinstance(agent, WhitelistLearner):  # don't sleep if we're about to train
             time.sleep(.5)
         state.reset()
+    print('\r', end='')
+    print(broken, end='', flush=True)
 
 
-examples = [[[['A_', '_']],  # 2 time steps of a 1x2 VaseWorld is all the whitelist learner needs
-             [['_', 'A_']]]]
-
-#for challenge in challenges:  # curated showcase
-#    run(VaseWorld(state=challenge))
+for challenge in challenges:  # curated showcase
+    run(VaseWorld(state=challenge))
 
 while True:  # random showcase
     run(VaseWorld(width=randint(3, 5), height=randint(3, 5),
