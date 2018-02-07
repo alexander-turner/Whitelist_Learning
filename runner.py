@@ -41,5 +41,5 @@ for challenge in challenges:  # curated showcase
 
 while True:  # random showcase
     level = run(VaseWorld(width=randint(3, 5), height=randint(3, 5),
-                          obstacle_chance=(random() + 1)/4),  # in [0.25, 0.75]
+                          obstacle_chance=(random() + 1)/4),  # in [0.25, 0.5]
                 level)

@@ -1,5 +1,6 @@
 import os
-import random
+from random import choice as rchoice
+from random import randint, random
 
 import pygame
 
@@ -14,57 +15,47 @@ class VaseWorld:
     obstacles = (chars['vase'], chars['crate'])
     time_cost = -1
     goal_reward = 60
+
+    agent_pos, goal_pos = None, None
     is_whitelist = False  # for rendering purposes
 
-    def __init__(self, width=4, height=4, state=None, obstacle_chance=.3):
-        if not 0 <= obstacle_chance <= 1:
-            raise Exception('Chance of a square containing an obstacle must be in [0, 1].')
-        self.obstacle_chance = obstacle_chance  # how likely any given square is to contain an obstacle
-
-        self.agent_pos, self.goal_pos = None, None
+    def __init__(self, state=None, width=4, height=4, obstacle_chance=.3):
         self.time_step = 0
         self.resources = {}
 
-        if state:
+        if state:  # prefab level
             self.width, self.height = len(state[0]), len(state)
             self.state = [row.copy() for row in state]  # copy so original blueprint remains
 
-            # Mark goal square
+            # Place the agent and the goal
             self.goal_pos = self.find_char('G')
             self.state[self.goal_pos[0]][self.goal_pos[1]] = self.chars['empty']
             self.agent_pos = self.find_char(self.chars['agent'])
-
-            self.original_state = [row.copy() for row in self.state]
-        else:
+        else:  # initialize a random VaseWorld
             self.width, self.height = width, height
-            self.regenerate()
+            if not 0 <= obstacle_chance <= 1:
+                raise Exception('Chance of a square containing an obstacle must be in [0, 1].')
+            self.obstacle_chance = obstacle_chance  # how likely any given square is to contain an obstacle
 
-    def regenerate(self):
-        """Initialize a random VaseWorld."""
-        self.state = [[self.chars['empty']] * self.width for _ in range(self.height)]
+            self.state = [[rchoice(self.obstacles) if random() <= self.obstacle_chance else self.chars['empty']
+                           for _ in range(self.width)]
+                          for _ in range(self.height)]
 
-        for row in range(self.height):
-            for col in range(self.width):
-                if random.random() <= self.obstacle_chance:  # place obstacles randomly
-                    self.state[row][col] = self.obstacles[random.randint(0, len(self.obstacles) - 1)]
-
-        # Agent always in top-left
-        self.agent_pos = self.find_char(self.chars['empty'], exclusive=True)
-        self.state[self.agent_pos[0]][self.agent_pos[1]] = self.chars['agent'] + self.chars['empty']  # place the agent
-
-        self.goal_pos = self.find_char(self.chars['empty'], exclusive=True)  # randomly place goal state
-
-        # Reset time counter
-        self.time_step = 0
+            # Place the agent and the goal
+            self.agent_pos = self.find_char(self.chars['empty'], exclusive=True)
+            self.state[self.agent_pos[0]][self.agent_pos[1]] = self.chars['agent'] + self.chars['empty']
+            self.goal_pos = self.find_char(self.chars['empty'], exclusive=True)
         self.original_state = [row.copy() for row in self.state]
 
     def find_char(self, char, exclusive=False):
-        """Returns the coordinates of a random square containing char (ASSUMES char is in state)."""
+        """Returns the coordinates of a random square containing char."""
         while True:
-            ind = random.randint(0, self.width * self.height - 1)
+            ind = randint(0, self.width * self.height - 1)
             pos = [ind // self.width, ind % self.width]
-            if pos != self.goal_pos and self.state[pos[0]][pos[1]] == char or \
-                    (not exclusive and char in self.state[pos[0]][pos[1]]):
+
+            # If exclusive, char has to be the tile's only occupant
+            if (self.state[pos[0]][pos[1]] == char or (not exclusive and char in self.state[pos[0]][pos[1]])) and \
+                            pos != self.goal_pos:
                 return pos
 
     def reset(self):
@@ -160,12 +151,6 @@ class VaseWorld:
             self.resources[char] = pygame.transform.scale(image, (self.tile_size, self.tile_size))
 
     def __str__(self):
-        rep = ''
-        for row in self.state:
-            for string in row:
-                if self.chars['agent'] in string:
-                    rep += self.chars['agent']  # occlude objects behind agent
-                else:
-                    rep += string
-            rep += '\n'
-        return rep
+        return '\n'.join(''.join(self.chars['agent'] if self.chars['agent'] in string else string
+                                 for string in row)
+                         for row in self.state)
