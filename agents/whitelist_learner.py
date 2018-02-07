@@ -24,7 +24,6 @@ class WhitelistLearner(QLearner):
 
     def penalty(self, state_a, state_b):
         """Calculate the penalty incurred by the transition from state_a to state_b."""
-        # NOTE transitions are being double-counted (counts leaving an unknown state (Ax, x) as bad)
         penalty = 0
         for difference in self.diff(state_a, state_b):
             if difference not in self.whitelist:
@@ -45,28 +44,14 @@ class WhitelistLearner(QLearner):
         while self.num_samples.min() < self.convergence_bound:
             row, col = randint(0, simulator.height - 1), randint(0, simulator.width - 1)
 
-            # Choose according to explore/exploit
-            action = self.e_greedy_action(row, col)
-
-            # Update sample count and learning rate
-            self.num_samples[row][col][action] += 1
-            learning_rate = 1 / self.num_samples[row][col][action]
-
             # Go to new simulator state and take action
             simulator.reset()
             simulator.set_agent_pos(simulator.agent_pos, [row, col])
             reward = simulator.get_reward()  # reward in state[row][col]
-
             old_state = [row.copy() for row in simulator.state]
+
+            action = self.e_greedy_action(row, col)  # choose according to explore/exploit
             simulator.take_action(self.actions[action])
+            self.num_samples[row][col][action] += 1  # update sample count
 
-            penalty = self.penalty(old_state, simulator.state)
-
-            # Perform TD update
-            self.Q[row][col][action] += learning_rate * (reward - penalty +
-                                                         self.discount * max(self.Q[simulator.agent_pos[0]][simulator.agent_pos[1]])
-                                                         - self.Q[row][col][action])
-
-            # See if this is better than state's current greedy action
-            if self.Q[row][col][action] > self.greedy_v[row][col]:
-                self.greedy_a[row][col], self.greedy_v[row][col] = action, self.Q[row][col][action]
+            self.update_greedy(row, col, action, reward - self.penalty(old_state, simulator.state), simulator)

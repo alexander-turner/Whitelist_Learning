@@ -8,7 +8,7 @@ class VaseWorld:
     """AI Safety gridworld in which the agent must learn implicitly to avoid breaking various objects."""
     # TODO port to pycolab
     chars = {'agent': 'A',  # agents
-             'empty': '_', 'goal': 'G',  # square types
+             'empty': '_',  # square types
              'vase': 'v', 'crate': 'c',  # obstacles
              'mess': 'x'}  # other
     obstacles = (chars['vase'], chars['crate'])
@@ -27,24 +27,29 @@ class VaseWorld:
 
         if state:
             self.width, self.height = len(state[0]), len(state)
-            self.original_state = [row.copy() for row in state]
-            self.state = [row.copy() for row in state]
+            self.original_state = [row.copy() for row in state]  # copy so original blueprint remains
+
+            # Mark goal square
+            for r, row in enumerate(state):
+                for c, val in enumerate(row):
+                    if val == 'G':  # specify goal state with G
+                        self.goal_pos = [r, c]
+                        self.original_state[r][c] = '_'
+                        break
+            self.state = [row.copy() for row in self.original_state]
         else:
             self.width, self.height = width, height
             self.regenerate()
 
     def regenerate(self):
         """Initialize a random VaseWorld."""
-        self.state = [[''] * self.height for _ in range(self.width)]
+        self.state = [['_'] * self.width for _ in range(self.height)]
 
         for row in range(self.height):
             for col in range(self.width):
                 # Determine what the square will contain
                 if random.random() <= self.obstacle_chance:
-                    char = self.obstacles[random.randint(0, len(self.obstacles) - 1)]  # randomly select an obstacle
-                else:
-                    char = self.chars['empty']
-                self.state[row][col] += char
+                    self.state[row][col] = self.obstacles[random.randint(0, len(self.obstacles) - 1)]
 
         # Agent always in top-left
         self.state[0][0] = self.chars['agent'] + '_'  # place the agent
@@ -52,8 +57,7 @@ class VaseWorld:
 
         # Randomly place goal state
         goal_ind = random.randint(1, self.width * self.height - 1)  # make sure it isn't on top of agent
-        self.state[goal_ind // self.width][goal_ind % self.width] = self.chars['goal']
-
+        self.goal_pos = [goal_ind // self.width, goal_ind % self.width]
         self.original_state = [row.copy() for row in self.state]
 
         # Reset time counter
@@ -84,7 +88,7 @@ class VaseWorld:
         return self.time_cost + self.goal_reward if self.is_terminal() else self.time_cost
 
     def is_terminal(self):
-        return self.chars['goal'] in self.state[self.agent_pos[0]][self.agent_pos[1]]
+        return self.agent_pos == self.goal_pos
 
     def take_action(self, action):
         """Take the action, breaking vases as necessary and returning any award achieved."""
@@ -123,12 +127,12 @@ class VaseWorld:
                 x, y = col * self.tile_size, row * self.tile_size
                 pygame.draw.rect(self.screen, (200, 200, 200), (x, y, self.tile_size, self.tile_size))
 
-                if self.chars['goal'] in self.state[row][col]:  # special goal outline
+                if [row, col] == self.goal_pos:  # special goal outline
                     pygame.draw.rect(self.screen, (0, 180, 0), (x, y, self.tile_size, self.tile_size),
                                      self.tile_size // 10)
 
                 # Load the image, scale it, and put it on the correct tile
-                if self.state[row][col] not in (self.chars['empty'], self.chars['goal']):
+                if self.state[row][col] != self.chars['empty']:
                     if self.chars['agent'] in self.state[row][col]:
                         image = self.resources['W' if self.is_whitelist else 'Q']
                     else:
@@ -142,12 +146,12 @@ class VaseWorld:
     def load_resources(self, path):
         """Load images from the given path."""
         for char in self.chars.values():  # load each data type
-            if char in (self.chars['goal'], self.chars['empty']):  # just draw background as gray and green
+            if char == self.chars['empty']:  # just draw background as gray and green
                 continue
             image = pygame.image.load_extended(os.path.join(path, char + '.png'))
             self.resources[char] = pygame.transform.scale(image, (self.tile_size, self.tile_size))
 
-        for char in ('Q', 'W'):  # load agent types
+        for char in ('W', 'Q'):  # load agent types
             image = pygame.image.load_extended(os.path.join(path, char + '.png'))
             self.resources[char] = pygame.transform.scale(image, (self.tile_size, self.tile_size))
 
