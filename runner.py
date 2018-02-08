@@ -7,7 +7,7 @@ from agents.whitelist_learner import WhitelistLearner
 from environments.vase_world.challenges import challenges
 from environments.vase_world.vases import VaseWorld
 
-examples = [[[['A_', '_']],  # 2 time steps of a 1x2 VaseWorld is all the whitelist learner needs
+examples = [[[['A_', '_']],  # 2 time steps of a 2x1 VaseWorld is all the whitelist learner needs
              [['_', 'A_']]]]
 
 broken = Counter()
@@ -15,7 +15,6 @@ broken = Counter()
 
 def run(state, level):
     """Run the given VaseWorld state for both learners."""
-    level += 1  # how many levels have we ran?
     for agent in (QLearner(state), WhitelistLearner(examples, state)):
         state.is_whitelist = isinstance(agent, WhitelistLearner)
         state.render()
@@ -30,8 +29,8 @@ def run(state, level):
         if not isinstance(agent, WhitelistLearner):  # don't sleep if we're about to train
             time.sleep(.5)
         state.reset()
-    print('\r', end='')
-    print('Round {}. {}'.format(level, broken), end='', flush=True)
+    level += 1  # how many levels have we ran?
+    print('\rRound {}. {}'.format(level, broken), end='', flush=True)
     return level
 
 
@@ -40,6 +39,5 @@ for challenge in challenges:  # curated showcase
     level = run(VaseWorld(state=challenge), level)
 
 while True:  # random showcase
-    level = run(VaseWorld(width=randint(3, 5), height=randint(3, 5),
-                          obstacle_chance=(random() + 1)/4),  # in [0.25, 0.5]
+    level = run(VaseWorld(width=randint(4, 5), height=randint(4, 5), obstacle_chance=(random() + 1)/4),  # [0.25, 0.5]
                 level)

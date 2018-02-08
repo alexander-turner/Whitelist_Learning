@@ -1,6 +1,6 @@
 import os
 from random import choice as rchoice
-from random import randint, random
+from random import random
 
 import pygame
 
@@ -13,7 +13,7 @@ class VaseWorld:
              'vase': 'v', 'crate': 'c',  # obstacles
              'mess': 'x'}  # other
     obstacles = (chars['vase'], chars['crate'])
-    time_cost = -1
+    movement_cost = 1
     goal_reward = 60
 
     agent_pos, goal_pos = None, None
@@ -49,14 +49,9 @@ class VaseWorld:
 
     def find_char(self, char, exclusive=False):
         """Returns the coordinates of a random square containing char."""
-        while True:
-            ind = randint(0, self.width * self.height - 1)
-            pos = [ind // self.width, ind % self.width]
-
-            # If exclusive, char has to be the tile's only occupant
-            if (self.state[pos[0]][pos[1]] == char or (not exclusive and char in self.state[pos[0]][pos[1]])) and \
-                            pos != self.goal_pos:
-                return pos
+        return rchoice([[r, c] for r, row in enumerate(self.state) for c, val in enumerate(row)
+                        if (char == val or (not exclusive and char in val))
+                        and [r, c] != self.goal_pos])
 
     def reset(self):
         """Reset the current variation."""
@@ -66,8 +61,7 @@ class VaseWorld:
 
     @staticmethod
     def get_actions():
-        """If an agent tries to move into a wall, nothing happens."""
-        return 'up', 'left', 'right', 'down'
+        return 'up', 'left', 'right', 'down', 'rest'
 
     def set_agent_pos(self, old_pos, new_pos):
         # Remove agent from current location
@@ -80,16 +74,13 @@ class VaseWorld:
         self.agent_pos = new_pos
 
     def get_reward(self):
-        return self.time_cost + self.goal_reward if self.is_terminal() else self.time_cost
+        return self.goal_reward if self.is_terminal() else 0
 
     def is_terminal(self):
         return self.agent_pos == self.goal_pos
 
     def take_action(self, action):
         """Take the action, breaking vases as necessary and returning any award achieved."""
-        self.time_step += 1  # keep the clock ticking
-
-        # Handle agent updating
         old_pos = self.agent_pos.copy()
         if action == 'up' and self.agent_pos[0] > 0:
             self.agent_pos[0] -= 1
@@ -99,13 +90,12 @@ class VaseWorld:
             self.agent_pos[1] -= 1
         elif action == 'right' and self.agent_pos[1] < self.width - 1:
             self.agent_pos[1] += 1
-
         self.set_agent_pos(old_pos, self.agent_pos)
 
-        return self.get_reward()
+        self.time_step += 1
+        return self.get_reward() - (0 if action == 'rest' else self.movement_cost)
 
     def render(self):
-        """Render the game board, creating a tkinter window if needed."""
         if not hasattr(self, 'screen'):
             pygame.init()
             self.tile_size = 50
