@@ -1,13 +1,12 @@
 import os
 from random import choice as rchoice
-from random import random
 
+import numpy as np
 import pygame
 
 
 class VaseWorld:
     """AI Safety gridworld in which the agent must learn implicitly to avoid breaking various objects."""
-    # TODO port to pycolab
     chars = {'agent': 'A',  # agents
              'empty': '_',  # square types
              'vase': 'v', 'crate': 'c',  # obstacles
@@ -19,44 +18,40 @@ class VaseWorld:
     agent_pos, goal_pos = None, None
     is_whitelist = False  # for rendering purposes
 
-    def __init__(self, state=None, width=4, height=4, obstacle_chance=.3):
+    def __init__(self, state=None, height=4, width=4, obstacle_chance=.3):
         self.time_step = 0
         self.resources = {}
 
         if state:  # prefab level
-            self.width, self.height = len(state[0]), len(state)
-            self.state = [row.copy() for row in state]  # copy so original blueprint remains
+            self.state = np.array(state)
+            self.height, self.width = self.state.shape
 
             # Place the agent and the goal
-            self.goal_pos = self.find_char('G')
-            self.state[self.goal_pos[0]][self.goal_pos[1]] = self.chars['empty']
-            self.agent_pos = self.find_char(self.chars['agent'])
+            self.goal_pos = np.argwhere(self.state == 'G')[0]  # text levels have to mark goal with G
+            self.state[tuple(self.goal_pos)] = self.chars['empty']
+            self.agent_pos = np.argwhere(self.state == self.chars['agent'] + '_')[0]
         else:  # initialize a random VaseWorld
-            self.width, self.height = width, height
+            self.height, self.width = height, width
             if not 0 <= obstacle_chance <= 1:
                 raise Exception('Chance of a square containing an obstacle must be in [0, 1].')
             self.obstacle_chance = obstacle_chance  # how likely any given square is to contain an obstacle
 
-            self.state = [[rchoice(self.obstacles) if random() <= self.obstacle_chance else self.chars['empty']
-                           for _ in range(self.width)]
-                          for _ in range(self.height)]
+            # Initialize 2x empty squares to prevent truncation; weird quirk of np.random.choice
+            self.state = np.random.choice([self.chars['empty'] * 2, *self.obstacles], size=(height, width),
+                                          p=[1 - self.obstacle_chance, *[obstacle_chance / len(self.obstacles)
+                                                                         for _ in self.obstacles]])  # TODO truncating
+            self.state[self.state == self.chars['empty'] * 2] = self.chars['empty']
 
             # Place the agent and the goal
-            self.agent_pos = self.find_char(self.chars['empty'], exclusive=True)
-            self.state[self.agent_pos[0]][self.agent_pos[1]] = self.chars['agent'] + self.chars['empty']
-            self.goal_pos = self.find_char(self.chars['empty'], exclusive=True)
-        self.original_state = [row.copy() for row in self.state]
-
-    def find_char(self, char, exclusive=False):
-        """Returns the coordinates of a random square containing char."""
-        return rchoice([[r, c] for r, row in enumerate(self.state) for c, val in enumerate(row)
-                        if (char == val or (not exclusive and char in val))
-                        and [r, c] != self.goal_pos])
+            self.agent_pos = rchoice(np.argwhere(self.state == self.chars['empty']))
+            self.state[tuple(self.agent_pos)] = self.chars['agent'] + self.chars['empty']
+            self.goal_pos = rchoice(np.argwhere(self.state == self.chars['empty']))
+        self.original_state = self.state.copy()
 
     def reset(self):
         """Reset the current variation."""
-        self.state = [row.copy() for row in self.original_state]
-        self.agent_pos = self.find_char(self.chars['agent'])
+        self.state = self.original_state.copy()
+        self.agent_pos = np.argwhere(self.state == self.chars['agent'] + '_')[0]
         self.time_step = 0
 
     @staticmethod
@@ -64,20 +59,23 @@ class VaseWorld:
         return 'up', 'left', 'right', 'down', 'rest'
 
     def set_agent_pos(self, old_pos, new_pos):
+        """@:param new_pos should be a numpy Array."""
+        if (old_pos == new_pos).all():  # if we're staying put, do nothing
+            return
         # Remove agent from current location
-        self.state[old_pos[0]][old_pos[1]] = self.state[old_pos[0]][old_pos[1]][1:]
+        self.state[tuple(old_pos)] = self.state[tuple(old_pos)][1:]
 
         # Break obstacles if needed; put agent in new spot
-        if self.state[new_pos[0]][new_pos[1]] in self.obstacles:
-            self.state[new_pos[0]][new_pos[1]] = self.chars['mess']
-        self.state[new_pos[0]][new_pos[1]] = self.chars['agent'] + self.state[new_pos[0]][new_pos[1]]
+        if self.state[tuple(new_pos)] in self.obstacles:
+            self.state[tuple(new_pos)] = self.chars['mess']
+        self.state[tuple(new_pos)] = self.chars['agent'] + self.state[tuple(new_pos)]
         self.agent_pos = new_pos
 
     def get_reward(self):
         return self.goal_reward if self.is_terminal() else 0
 
     def is_terminal(self):
-        return self.agent_pos == self.goal_pos
+        return (self.agent_pos == self.goal_pos).all()
 
     def take_action(self, action):
         """Take the action, breaking vases as necessary and returning any award achieved."""
@@ -109,19 +107,20 @@ class VaseWorld:
 
         for row in range(self.height):
             for col in range(self.width):
+                coord = (row, col)
                 x, y = col * self.tile_size, row * self.tile_size
                 pygame.draw.rect(self.screen, (200, 200, 200), (x, y, self.tile_size, self.tile_size))
 
-                if [row, col] == self.goal_pos:  # special goal outline
+                if (coord == self.goal_pos).all():  # special goal outline
                     pygame.draw.rect(self.screen, (0, 180, 0), (x, y, self.tile_size, self.tile_size),
                                      self.tile_size // 10)
 
                 # Load the image, scale it, and put it on the correct tile
-                if self.state[row][col] != self.chars['empty']:
-                    if self.chars['agent'] in self.state[row][col]:
+                if self.state[coord] != self.chars['empty']:
+                    if self.chars['agent'] in self.state[coord]:
                         image = self.resources['W' if self.is_whitelist else 'Q']
                     else:
-                        image = self.resources[self.state[row][col][0]]  # show what's on top
+                        image = self.resources[self.state[coord][0]]  # show what's on top
                     piece_rect = image.get_rect()
                     piece_rect.move_ip(self.tile_size * col, self.tile_size * row)  # move in-place
                     self.screen.blit(image, piece_rect)  # draw the tile

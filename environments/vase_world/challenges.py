@@ -1,4 +1,3 @@
-# Problems designed to trip up normal RL
 challenges = [[['A_', 'v', 'v', 'G'],
                ['_', 'v', 'v', '_'],
                ['_', 'v', 'v', '_'],

@@ -14,7 +14,7 @@ class QLearner:
         self.num_states = simulator.height * simulator.width
         self.Q = np.zeros((simulator.height, simulator.width, len(self.actions)))
         self.greedy_a, self.greedy_v = np.zeros((simulator.height, simulator.width), int), \
-                                       np.full((simulator.height, simulator.width), float('-inf'))  # greedy record-keeping
+                                       np.full((simulator.height, simulator.width), float('-inf'))
 
         self.num_samples = np.zeros((simulator.height, simulator.width, len(self.actions)), int)
 
@@ -23,35 +23,36 @@ class QLearner:
 
     def train(self, simulator):
         while self.num_samples.min() < self.convergence_bound:
-            row, col = randint(0, simulator.height - 1), randint(0, simulator.width - 1)
+            new_pos = randint(0, simulator.height - 1), randint(0, simulator.width - 1)
 
             # Go to new simulator state and take action
-            simulator.set_agent_pos(simulator.agent_pos, [row, col])
+            simulator.reset()
+            simulator.set_agent_pos(simulator.agent_pos, np.array(new_pos))
             reward = simulator.get_reward()
 
-            action = self.e_greedy_action(row, col)  # choose according to explore/exploit
+            action = self.e_greedy_action(new_pos)  # choose according to explore/exploit
             simulator.take_action(self.actions[action])
-            self.num_samples[row][col][action] += 1  # update sample count
+            self.num_samples[new_pos][action] += 1  # update sample count
 
-            self.update_greedy(row, col, action, reward, simulator)
+            self.update_greedy(new_pos, action, reward, simulator)
 
-    def e_greedy_action(self, row, col):
-        """Returns the e-greedy action index for the given row and column."""
-        action = self.greedy_a[row][col]
+    def e_greedy_action(self, new_pos):
+        """Returns the e-greedy action index for the given position."""
+        action = self.greedy_a[new_pos]
         if random() < self.epsilon:
             action = randint(0, len(self.actions) - 1)
-            while action == self.greedy_a[row][col]:  # make sure we don't choose the greedy action
+            while action == self.greedy_a[new_pos]:  # make sure we don't choose the greedy action
                 action = randint(0, len(self.actions) - 1)
         return action
 
-    def update_greedy(self, row, col, action, reward, simulator):
+    def update_greedy(self, new_pos, action, reward, simulator):
         """Perform TD update on observed reward; update greedy actions and values, if appropriate."""
-        learning_rate = 1 / self.num_samples[row][col][action]
+        learning_rate = 1 / self.num_samples[new_pos][action]
         best_q = max(self.Q[simulator.agent_pos[0]][simulator.agent_pos[1]])
-        self.Q[row][col][action] += learning_rate * (reward + self.discount * best_q - self.Q[row][col][action])
+        self.Q[new_pos][action] += learning_rate * (reward + self.discount * best_q - self.Q[new_pos][action])
 
-        if self.Q[row][col][action] > self.greedy_v[row][col]:
-            self.greedy_a[row][col], self.greedy_v[row][col] = action, self.Q[row][col][action]
+        if self.Q[new_pos][action] > self.greedy_v[new_pos]:
+            self.greedy_a[new_pos], self.greedy_v[new_pos] = action, self.Q[new_pos][action]
 
     def choose_action(self, state):
-        return self.actions[self.greedy_a[state.agent_pos[0]][state.agent_pos[1]]]
+        return self.actions[self.greedy_a[tuple(state.agent_pos)]]

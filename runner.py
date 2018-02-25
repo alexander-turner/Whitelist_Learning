@@ -2,42 +2,43 @@ import time
 from collections import Counter
 from random import random, randint
 
+import numpy as np
+
 from agents.q_learner import QLearner
 from agents.whitelist_learner import WhitelistLearner
-from environments.vase_world.challenges import challenges
 from environments.vase_world.vases import VaseWorld
 
-examples = [[[['A_', '_']],  # 2 time steps of a 2x1 VaseWorld is all the whitelist learner needs
-             [['_', 'A_']]]]
+examples = np.array([[[['A_', '_']],  # 2 time steps of a 2x1 VaseWorld is all the whitelist learner needs
+                      [['_', 'A_']]]])
 
 broken = Counter()
 
 
-def run(state, level):
+def run(simulator, round_counter):
     """Run the given VaseWorld state for both learners."""
-    for agent in (QLearner(state), WhitelistLearner(examples, state)):
-        state.is_whitelist = isinstance(agent, WhitelistLearner)
-        state.render()
+    for agent in (QLearner(simulator), WhitelistLearner(examples, simulator)):
+        simulator.is_whitelist = isinstance(agent, WhitelistLearner)
+        simulator.render()
 
         # shouldn't take more than w*h steps to complete; ensure whitelist isn't stuck behind obstacles
-        while state.time_step < state.width * state.height and not state.is_terminal():
+        while simulator.time_step < simulator.width * simulator.height and not simulator.is_terminal():
             time.sleep(.1)
-            state.take_action(agent.choose_action(state))
-            state.render()
+            simulator.take_action(agent.choose_action(simulator))
+            simulator.render()
 
-        broken[agent.__class__] += sum([sum([1 for c in row if c == state.chars['mess']]) for row in state.state])
+        broken[agent.__class__] += (simulator.state == simulator.chars['mess']).sum()
         if not isinstance(agent, WhitelistLearner):  # don't sleep if we're about to train
             time.sleep(.5)
-        state.reset()
-    level += 1  # how many levels have we ran?
-    print('\rRound {}. {}'.format(level, broken), end='', flush=True)
-    return level
+        simulator.reset()
+    round_counter += 1  # how many levels have we ran?
+    print('\rRound {}. {}'.format(round_counter, broken), end='', flush=True)
+    return round_counter
 
 
-level = 0
-for challenge in challenges:  # curated showcase
-    level = run(VaseWorld(state=challenge), level)
+round_counter = 0
+#for challenge in challenges:  # curated showcase
+#    round_counter = run(VaseWorld(state=challenge), round_counter)
 
-while True:  # random showcase
-    level = run(VaseWorld(width=randint(4, 5), height=randint(4, 5), obstacle_chance=(random() + 1)/4),  # [0.25, 0.5]
-                level)
+for _ in range(1000):  # random showcase
+    round_counter = run(VaseWorld(height=randint(4, 5), width=randint(4, 5), obstacle_chance=(random() + 1) / 4),
+                        round_counter)
