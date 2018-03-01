@@ -39,7 +39,7 @@ class VaseWorld:
             # Initialize 2x empty squares to prevent truncation; weird quirk of np.random.choice
             self.state = np.random.choice([self.chars['empty'] * 2, *self.obstacles], size=(height, width),
                                           p=[1 - self.obstacle_chance, *[obstacle_chance / len(self.obstacles)
-                                                                         for _ in self.obstacles]])  # TODO truncating
+                                                                         for _ in self.obstacles]])
             self.state[self.state == self.chars['empty'] * 2] = self.chars['empty']
 
             # Place the agent and the goal

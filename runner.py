@@ -6,6 +6,7 @@ import numpy as np
 
 from agents.q_learner import QLearner
 from agents.whitelist_learner import WhitelistLearner
+from environments.vase_world.challenges import challenges
 from environments.vase_world.vases import VaseWorld
 
 examples = np.array([[[['A_', '_']],  # 2 time steps of a 2x1 VaseWorld is all the whitelist learner needs
@@ -36,8 +37,8 @@ def run(simulator, round_counter):
 
 
 round_counter = 0
-#for challenge in challenges:  # curated showcase
-#    round_counter = run(VaseWorld(state=challenge), round_counter)
+for challenge in challenges:  # curated showcase
+    round_counter = run(VaseWorld(state=challenge), round_counter)
 
 for _ in range(1000):  # random showcase
     round_counter = run(VaseWorld(height=randint(4, 5), width=randint(4, 5), obstacle_chance=(random() + 1) / 4),

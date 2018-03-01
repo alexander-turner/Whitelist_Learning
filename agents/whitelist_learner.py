@@ -25,7 +25,7 @@ class WhitelistLearner(QLearner):
             """Using the whitelist counts, calculate penalty for square_a -> square_b."""
             return self.unknown_cost if square_a != square_b and (square_a, square_b) not in self.whitelist else 0
 
-        return sum([penalty(tile_a, tile_b) for tile_a, tile_b in self.diff(state_a, state_b)])  # TODO numpy
+        return sum([penalty(tile_a, tile_b) for tile_a, tile_b in self.diff(state_a, state_b)])
 
     @staticmethod
     def diff(state_a, state_b):
