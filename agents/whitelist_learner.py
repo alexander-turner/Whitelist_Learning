@@ -14,7 +14,7 @@ class WhitelistLearner(QLearner):
     def __init__(self, simulator, examples):  # TODO make it not retrain on examples each time?
         """Takes a series of state representations (training set) and a simulator."""
         # Prepare faux recognition
-        self.recognition_samples = np.random.normal(.9, .01, 100)
+        self.recognition_samples = np.random.normal(1, 0, 100)
         objects, self.other_objects = tuple(simulator.chars.values()), dict.fromkeys(simulator.chars.values())
 
         # Generate second-best recognition candidates - should be roughly same each time a given object is recognized
@@ -24,11 +24,11 @@ class WhitelistLearner(QLearner):
                 while self.other_objects[key] == key:  # make sure we don't select the same object twice
                     self.other_objects[key] = rchoice(objects)
 
-        counts = Counter()
-        self.whitelist = defaultdict(float)  # whitelist[sq1, sq2] := average prob shift for sq1 -> sq2 during training
+        # whitelist[sq, sq_prime] := average prob shift for sq1 -> sq2 during training
+        counts, self.whitelist = Counter(), defaultdict(float)
         for example in examples:
             old_state = self.observe_state(example[0]).flatten()
-            for state_b in example[1:]:  # for each of the t-1 transitory time slices
+            for state_b in example[1:]:  # for each of the t-1 transitions
                 new_state = self.observe_state(state_b).flatten()
                 for old_dist, new_dist in zip(old_state, new_state):  # for each square's distributions
                     for sq, sq_prime, probability in self.transition_probabilities(old_dist, new_dist):
@@ -64,11 +64,8 @@ class WhitelistLearner(QLearner):
         """Return changes in probability mass (both the increases and the decreases)."""
         increases, decreases, total_change = {}, {}, 0
         for key, val in old.items():
-            if key not in new:  # probability mass totally transferred
-                decreases[key] = val
-                total_change += val
-            elif new[key] < old[key]:
-                decreases[key] = old[key] - new[key]
+            if key not in new or new[key] < old[key]:  # probability mass totally transferred
+                decreases[key] = old[key] - (new[key] if key in new else 0)
                 total_change += val  # only for decreases so we don't double-count
             elif new[key] > old[key]:
                 increases[key] = new[key] - old[key]
@@ -79,7 +76,8 @@ class WhitelistLearner(QLearner):
 
     def total_penalty(self, state_a, state_b):
         """Calculate the penalty incurred by the transition from state_a to state_b."""
-        return sum([self.penalty(sq, sq_prime, probability) for dist_a, dist_b in zip(state_a.flatten(), state_b.flatten())
+        return sum([self.penalty(sq, sq_prime, probability)  # TODO background penalty
+                    for dist_a, dist_b in zip(state_a.flatten(), state_b.flatten())
                     for sq, sq_prime, probability in self.transition_probabilities(dist_a, dist_b)])
 
     def penalty(self, square_a, square_b, shift):
@@ -90,17 +88,15 @@ class WhitelistLearner(QLearner):
 
     def train(self, simulator):
         while self.num_samples.min() < self.convergence_bound:
-            new_pos = randint(0, simulator.height - 1), randint(0, simulator.width - 1)
-
             # Go to new simulator state and take action
             simulator.reset()
-            simulator.set_agent_pos(simulator.agent_pos, np.array(new_pos))
-            reward = simulator.get_reward()  # reward in state[row, col]
+            start_pos = randint(0, simulator.height - 1), randint(0, simulator.width - 1)
+            simulator.agent_pos = np.array(start_pos)
             old_state = self.observe_state(simulator.state)
 
-            action = self.e_greedy_action(new_pos)  # choose according to explore/exploit
-            simulator.take_action(self.actions[action])
-            self.num_samples[new_pos][action] += 1  # update sample count
+            action = self.e_greedy_action(start_pos)  # choose according to explore/exploit
+            reward = simulator.take_action(self.actions[action])
+            self.num_samples[start_pos][action] += 1  # update sample count
 
             new_state = self.observe_state(simulator.state)
-            self.update_greedy(new_pos, action, reward - self.total_penalty(old_state, new_state), simulator)
+            self.update_greedy(start_pos, action, reward - self.total_penalty(old_state, new_state), simulator)

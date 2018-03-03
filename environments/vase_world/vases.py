@@ -58,7 +58,7 @@ class VaseWorld:
     def get_actions():
         return 'up', 'left', 'right', 'down', 'rest'
 
-    def set_agent_pos(self, old_pos, new_pos):
+    def update_agent_pos(self, old_pos, new_pos):
         """@:param new_pos should be a numpy Array."""
         if (old_pos == new_pos).all():  # if we're staying put, do nothing
             return
@@ -85,7 +85,7 @@ class VaseWorld:
             self.agent_pos[1] -= 1
         elif action == 'right' and self.agent_pos[1] < self.width - 1:
             self.agent_pos[1] += 1
-        self.set_agent_pos(old_pos, self.agent_pos)
+        self.update_agent_pos(old_pos, self.agent_pos)
 
         self.time_step += 1
         return self.get_reward() - (0 if action == 'rest' else self.movement_cost)
