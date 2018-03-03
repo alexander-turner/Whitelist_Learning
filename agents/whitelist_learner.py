@@ -11,10 +11,19 @@ class WhitelistLearner(QLearner):
     """A cautious agent that tries not to change the world too much in unknown ways."""
     unknown_cost = 300  # cost of each unknown change effected to the environment
 
-    def __init__(self, simulator, examples):
+    def __init__(self, simulator, examples):  # TODO make it not retrain on examples each time?
         """Takes a series of state representations (training set) and a simulator."""
-        self.recognition = {obj: self.recognize(obj, tuple(simulator.chars.values()))
-                            for obj in simulator.chars.values()}
+        # Prepare faux recognition
+        self.recognition_samples = np.random.normal(.9, .01, 100)
+        objects, self.other_objects = tuple(simulator.chars.values()), dict.fromkeys(simulator.chars.values())
+
+        # Generate second-best recognition candidates - should be roughly same each time a given object is recognized
+        for key in self.other_objects.keys():
+            self.other_objects[key] = rchoice(objects)
+            if len(objects) > 1:  # make sure there *is* another object we can choose
+                while self.other_objects[key] == key:  # make sure we don't select the same object twice
+                    self.other_objects[key] = rchoice(objects)
+
         counts = Counter()
         self.whitelist = defaultdict(float)  # whitelist[sq1, sq2] := average prob shift for sq1 -> sq2 during training
         for example in examples:
@@ -30,18 +39,15 @@ class WhitelistLearner(QLearner):
             self.whitelist[key] /= counts[key]
         super().__init__(simulator)  # do normal training
 
-    def recognize(self, obj, objects):
+    def recognize(self, obj):
         """Simulate probabilistic object recognition."""
-        distribution = {obj: np.random.normal(.9, .001)}
-        other_obj = rchoice(objects)  # make sure we don't select the same object twice
-        while other_obj == obj:
-            other_obj = rchoice(objects)
-        distribution[other_obj] = 1 - distribution[obj]
+        distribution = {obj: rchoice(self.recognition_samples)}
+        distribution[self.other_objects[obj]] = 1 - distribution[obj]
         return distribution
 
     def observe_state(self, state):
         """Uncertain state recognition."""
-        return np.array([[self.recognition[obj] for obj in row] for row in state])
+        return np.array([[self.recognize(obj) for obj in row] for row in state])
 
     def transition_probabilities(self, old, new):
         """Get the possible probability shifts between the distributions."""
@@ -76,10 +82,10 @@ class WhitelistLearner(QLearner):
         return sum([self.penalty(sq, sq_prime, probability) for dist_a, dist_b in zip(state_a.flatten(), state_b.flatten())
                     for sq, sq_prime, probability in self.transition_probabilities(dist_a, dist_b)])
 
-    def penalty(self, square_a, square_b, shift=0):
+    def penalty(self, square_a, square_b, shift):
         """Using the whitelist average probability shifts, calculate penalty."""
         if square_a == square_b: return 0
-        if (square_a, square_b) not in self.whitelist: return self.unknown_cost
+        if (square_a, square_b) not in self.whitelist: return shift * self.unknown_cost
         return max(0, shift - self.whitelist[square_a, square_b]) * self.unknown_cost  # TODO more sophisticated?
 
     def train(self, simulator):
@@ -89,7 +95,7 @@ class WhitelistLearner(QLearner):
             # Go to new simulator state and take action
             simulator.reset()
             simulator.set_agent_pos(simulator.agent_pos, np.array(new_pos))
-            reward = simulator.get_reward()  # reward in state[row][col]
+            reward = simulator.get_reward()  # reward in state[row, col]
             old_state = self.observe_state(simulator.state)
 
             action = self.e_greedy_action(new_pos)  # choose according to explore/exploit
