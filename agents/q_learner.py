@@ -46,8 +46,8 @@ class QLearner:
     def update_greedy(self, start_pos, action, reward, simulator):
         """Perform TD update on observed reward; update greedy actions and values, if appropriate."""
         learning_rate = 1 / self.num_samples[start_pos][action]
-        best_q = max(self.Q[tuple(simulator.agent_pos)])
-        self.Q[start_pos][action] += learning_rate * (reward + self.discount * best_q - self.Q[start_pos][action])
+        self.Q[start_pos][action] += learning_rate * (reward + self.discount * max(self.Q[tuple(simulator.agent_pos)])
+                                                      - self.Q[start_pos][action])
 
         if self.Q[start_pos][action] > self.greedy_v[start_pos]:
             self.greedy_a[start_pos], self.greedy_v[start_pos] = action, self.Q[start_pos][action]

@@ -63,8 +63,8 @@ class VaseWorld:
         if (old_pos == new_pos).all():  # if we're staying put, do nothing
             return
 
-        # Break obstacles if needed; put agent in new spot
-        if self.state[tuple(new_pos)] in self.obstacles:
+        # Break obstacles if needed (moving from a square with a vase will also break it)
+        if self.state[tuple(old_pos)] in self.obstacles or self.state[tuple(new_pos)] in self.obstacles:
             self.state[tuple(new_pos)] = self.chars['mess']
         self.agent_pos = new_pos
 
