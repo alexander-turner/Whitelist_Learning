@@ -9,8 +9,8 @@ from agents.whitelist_learner import WhitelistLearner
 from environments.vase_world.challenges import challenges
 from environments.vase_world.vases import VaseWorld
 
-examples = np.array([[[['A_', '_']],  # 2 time steps of a 2x1 VaseWorld is all the whitelist learner needs
-                      [['_', 'A_']]]])
+examples = np.array([[[['_', '_']],  # 2 time steps of a 2x1 VaseWorld is all the whitelist learner needs TODO Clarify
+                      [['_', '_']]]])
 
 broken = Counter()
 
@@ -26,6 +26,7 @@ def run(simulator, round_counter):
             time.sleep(.1)
             simulator.take_action(agent.choose_action(simulator))
             simulator.render(agent.observe_state(simulator.state) if isinstance(agent, WhitelistLearner) else None)
+            print(simulator)
 
         broken[agent.__class__] += (simulator.state == simulator.chars['mess']).sum()
         if not isinstance(agent, WhitelistLearner):  # don't sleep if we're about to train

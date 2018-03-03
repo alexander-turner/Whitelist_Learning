@@ -100,22 +100,21 @@ class VaseWorld:
             if len(self.resources) == 0:
                 self.load_resources("environments\\vase_world\\resources")
         pygame.event.clear()  # allows for pausing and debugging without losing rendering capability
+        self.screen.fill((200, 200, 200))
 
         for row in range(self.height):
             for col in range(self.width):
                 coord = (row, col)
                 x, y = col * self.tile_size, row * self.tile_size
-                pygame.draw.rect(self.screen, (200, 200, 200), (x, y, self.tile_size, self.tile_size))
 
                 if (coord == self.goal_pos).all():  # prioritize agent if on top
                     pygame.draw.rect(self.screen, (0, 180, 0), (x, y, self.tile_size, self.tile_size),
                                      self.tile_size // 10)
-                if (coord == self.agent_pos).all() or self.state[coord] != self.chars['empty']:
-                    if prob_state:
-                        for key, val in prob_state[coord].vals():
-                            self.render_square(row, col, key, alpha=val)
-                    else:
-                        self.render_square(row, col, self.state[coord])
+                if prob_state is not None:
+                    for key, val in prob_state[coord].items():
+                        self.render_square(row, col, key, alpha=val)
+                else:
+                    self.render_square(row, col, self.state[coord])
 
         pygame.display.update()  # update visible display
 
@@ -123,9 +122,12 @@ class VaseWorld:
         """Load the image, scale it, and put it on the correct tile"""
         if ((row, col) == self.agent_pos).all():
             image = self.resources['W' if self.is_whitelist else 'Q']
+        elif square == self.chars['empty']:
+            return
         else:
             image = self.resources[square[0]]  # show what's on top
-        image.set_alpha(alpha)  # set transparency
+
+        image.set_alpha(alpha * 255)  # set transparency
         piece_rect = image.get_rect()
         piece_rect.move_ip(self.tile_size * col, self.tile_size * row)  # move in-place
         self.screen.blit(image, piece_rect)  # draw the tile
@@ -135,11 +137,15 @@ class VaseWorld:
         for char in self.chars.values():  # load each data type
             if char == self.chars['empty']:  # just draw background as gray and green
                 continue
-            image = pygame.image.load_extended(os.path.join(path, char + '.png'))
+            image = pygame.image.load_extended(os.path.join(path, char + '.png')).convert()
+            trans_color = image.get_at((0, 0))
+            image.set_colorkey(trans_color)  # TODO make nice
             self.resources[char] = pygame.transform.scale(image, (self.tile_size, self.tile_size))
 
         for char in ('W', 'Q'):  # load agent types
-            image = pygame.image.load_extended(os.path.join(path, char + '.png'))
+            image = pygame.image.load_extended(os.path.join(path, char + '.png')).convert()
+            trans_color = image.get_at((0, 0))
+            image.set_colorkey(trans_color)
             self.resources[char] = pygame.transform.scale(image, (self.tile_size, self.tile_size))
 
     def __str__(self):
