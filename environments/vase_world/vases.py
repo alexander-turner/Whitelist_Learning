@@ -7,14 +7,14 @@ import pygame
 
 class VaseWorld:
     """AI Safety gridworld in which the agent must learn implicitly to avoid breaking various objects."""
-    chars = {'agent': 'A',  # agents
-             'empty': '_',  # square types
+    chars = {'empty': '_',  # square types
              'vase': 'v', 'crate': 'c',  # obstacles
              'mess': 'x'}  # other
     obstacles = (chars['vase'], chars['crate'])
+    input_chars = {'agent': 'A', 'goal': 'G'}  # only used for reading in custom levels
+
     movement_cost = 1
     goal_reward = 60
-
     agent_pos, goal_pos = None, None
     is_whitelist = False  # for rendering purposes
 
@@ -27,31 +27,30 @@ class VaseWorld:
             self.height, self.width = self.state.shape
 
             # Place the agent and the goal
-            self.goal_pos = np.argwhere(self.state == 'G')[0]  # text levels have to mark goal with G
-            self.state[tuple(self.goal_pos)] = self.chars['empty']
-            self.agent_pos = np.argwhere(self.state == self.chars['agent'] + '_')[0]
+            self.goal_pos = np.argwhere(self.state == self.input_chars['goal'])[0]
+            self.agent_pos = np.argwhere(self.state == self.input_chars['agent'])[0]
+            for pos in (self.agent_pos, self.goal_pos):
+                self.state[tuple(pos)] = self.chars['empty']
         else:  # initialize a random VaseWorld
             self.height, self.width = height, width
             if not 0 <= obstacle_chance <= 1:
                 raise Exception('Chance of a square containing an obstacle must be in [0, 1].')
             self.obstacle_chance = obstacle_chance  # how likely any given square is to contain an obstacle
 
-            # Initialize 2x empty squares to prevent truncation; weird quirk of np.random.choice
-            self.state = np.random.choice([self.chars['empty'] * 2, *self.obstacles], size=(height, width),
+            self.state = np.random.choice([self.chars['empty'], *self.obstacles], size=(height, width),
                                           p=[1 - self.obstacle_chance, *[obstacle_chance / len(self.obstacles)
                                                                          for _ in self.obstacles]])
-            self.state[self.state == self.chars['empty'] * 2] = self.chars['empty']
 
-            # Place the agent and the goal
+            # Find the agent and the goal
             self.agent_pos = rchoice(np.argwhere(self.state == self.chars['empty']))
-            self.state[tuple(self.agent_pos)] = self.chars['agent'] + self.chars['empty']
             self.goal_pos = rchoice(np.argwhere(self.state == self.chars['empty']))
+        self.original_agent_pos = self.agent_pos.copy()
         self.original_state = self.state.copy()
 
     def reset(self):
         """Reset the current variation."""
         self.state = self.original_state.copy()
-        self.agent_pos = np.argwhere(self.state == self.chars['agent'] + '_')[0]
+        self.agent_pos = self.original_agent_pos.copy()
         self.time_step = 0
 
     @staticmethod
@@ -62,13 +61,10 @@ class VaseWorld:
         """@:param new_pos should be a numpy Array."""
         if (old_pos == new_pos).all():  # if we're staying put, do nothing
             return
-        # Remove agent from current location
-        self.state[tuple(old_pos)] = self.state[tuple(old_pos)][1:]
 
         # Break obstacles if needed; put agent in new spot
         if self.state[tuple(new_pos)] in self.obstacles:
             self.state[tuple(new_pos)] = self.chars['mess']
-        self.state[tuple(new_pos)] = self.chars['agent'] + self.state[tuple(new_pos)]
         self.agent_pos = new_pos
 
     def get_reward(self):
@@ -93,7 +89,7 @@ class VaseWorld:
         self.time_step += 1
         return self.get_reward() - (0 if action == 'rest' else self.movement_cost)
 
-    def render(self):
+    def render(self, prob_state=None):
         if not hasattr(self, 'screen'):
             pygame.init()
             self.tile_size = 50
@@ -111,21 +107,28 @@ class VaseWorld:
                 x, y = col * self.tile_size, row * self.tile_size
                 pygame.draw.rect(self.screen, (200, 200, 200), (x, y, self.tile_size, self.tile_size))
 
-                if (coord == self.goal_pos).all():  # special goal outline
+                if (coord == self.goal_pos).all():  # prioritize agent if on top
                     pygame.draw.rect(self.screen, (0, 180, 0), (x, y, self.tile_size, self.tile_size),
                                      self.tile_size // 10)
-
-                # Load the image, scale it, and put it on the correct tile
-                if self.state[coord] != self.chars['empty']:
-                    if self.chars['agent'] in self.state[coord]:
-                        image = self.resources['W' if self.is_whitelist else 'Q']
+                if (coord == self.agent_pos).all() or self.state[coord] != self.chars['empty']:
+                    if prob_state:
+                        for key, val in prob_state[coord].vals():
+                            self.render_square(row, col, key, alpha=val)
                     else:
-                        image = self.resources[self.state[coord][0]]  # show what's on top
-                    piece_rect = image.get_rect()
-                    piece_rect.move_ip(self.tile_size * col, self.tile_size * row)  # move in-place
-                    self.screen.blit(image, piece_rect)  # draw the tile
+                        self.render_square(row, col, self.state[coord])
 
         pygame.display.update()  # update visible display
+
+    def render_square(self, row, col, square, alpha=1):
+        """Load the image, scale it, and put it on the correct tile"""
+        if ((row, col) == self.agent_pos).all():
+            image = self.resources['W' if self.is_whitelist else 'Q']
+        else:
+            image = self.resources[square[0]]  # show what's on top
+        image.set_alpha(alpha)  # set transparency
+        piece_rect = image.get_rect()
+        piece_rect.move_ip(self.tile_size * col, self.tile_size * row)  # move in-place
+        self.screen.blit(image, piece_rect)  # draw the tile
 
     def load_resources(self, path):
         """Load images from the given path."""
@@ -140,6 +143,14 @@ class VaseWorld:
             self.resources[char] = pygame.transform.scale(image, (self.tile_size, self.tile_size))
 
     def __str__(self):
-        return '\n'.join(''.join(self.chars['agent'] if self.chars['agent'] in string else string
-                                 for string in row)
-                         for row in self.state)
+        string = ''
+        for row_ind, row in enumerate(self.state):
+            for char_ind, char in enumerate(row):
+                if ((row_ind, char_ind) == self.agent_pos).all():
+                    string += self.input_chars['agent']
+                elif ((row_ind, char_ind) == self.goal_pos).all():
+                    string += self.input_chars['goal']
+                else:
+                    string += char
+            string += '\n'
+        return string

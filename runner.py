@@ -17,15 +17,15 @@ broken = Counter()
 
 def run(simulator, round_counter):
     """Run the given VaseWorld state for both learners."""
-    for agent in (QLearner(simulator), WhitelistLearner(examples, simulator)):
+    for agent in (QLearner(simulator), WhitelistLearner(simulator, examples)):
         simulator.is_whitelist = isinstance(agent, WhitelistLearner)
         simulator.render()
 
-        # shouldn't take more than w*h steps to complete; ensure whitelist isn't stuck behind obstacles
+        # Shouldn't take more than w*h steps to complete; ensure whitelist isn't stuck behind obstacles
         while simulator.time_step < simulator.width * simulator.height and not simulator.is_terminal():
             time.sleep(.1)
             simulator.take_action(agent.choose_action(simulator))
-            simulator.render()
+            simulator.render(agent.observe_state(simulator.state) if isinstance(agent, WhitelistLearner) else None)
 
         broken[agent.__class__] += (simulator.state == simulator.chars['mess']).sum()
         if not isinstance(agent, WhitelistLearner):  # don't sleep if we're about to train

@@ -1,4 +1,5 @@
-from collections import Counter
+from collections import Counter, defaultdict
+from random import choice as rchoice
 from random import randint
 
 import numpy as np
@@ -12,18 +13,63 @@ class WhitelistLearner(QLearner):
 
     def __init__(self, examples, simulator):
         """Takes a series of state representations (training set) and a simulator."""
-        self.whitelist = Counter()  # whitelist[char1, char2] := # of times char1 -> char2 observed during training
+        self.objects = tuple(simulator.chars.values())
+        counts = Counter()
+        self.whitelist = defaultdict(float)  # whitelist[sq1, sq2] := average prob shift for sq1 -> sq2 during training
         for example in examples:
-            for ind, state_b in enumerate(example[1:], start=1):  # for each of the t-1 transitory time slices
-                self.whitelist.update(self.diff(example[ind-1], state_b))  # each observed transition
-
+            last_state = self.observe_state(example[0]).flatten()
+            for state_b in example[1:]:  # for each of the t-1 transitory time slices
+                new_state = self.observe_state(state_b).flatten()
+                for last_dist, new_dist in zip(last_state, new_state):
+                    increases, decreases, total_change = self.group_deltas(last_dist, new_dist)
+                    for sq, decrease in decreases.items():  # how much probability mass did sq lose?
+                        for sq_prime, increase in increases.items():  # and where could it have gone?
+                            self.whitelist[sq, sq_prime] += decrease * increase / total_change
+                            counts[sq, sq_prime] += 1
+                last_state = new_state
+        for key in self.whitelist.keys():
+            self.whitelist[key] /= counts[key]
         super().__init__(simulator)  # do normal training
+
+    @staticmethod
+    def group_deltas(last, new):
+        """Return changes in probability mass (both the increases and the decreases)."""
+        increases, decreases, total_change = {}, {}, 0
+        for key, val in last.items():
+            if key not in new:  # probability mass totally transferred
+                decreases[key] = val
+                total_change += val
+            elif new[key] < last[key]:
+                decreases[key] = last[key] - new[key]
+                total_change += val  # only for decreases so we don't double-count
+            elif new[key] > last[key]:
+                increases[key] = new[key] - last[key]
+        for key, val in new.items():
+            if key not in last:
+                increases[key] = val
+        return increases, decreases, total_change
+
+    def observe_state(self, state):
+        """Uncertain state recognition."""
+        return np.array([[self.recognize(obj) for obj in state[0]] for _ in state])
+
+    def recognize(self, obj):
+        """Simulate probabilistic object recognition."""
+        distribution = {obj: np.random.normal(.9, .001)}
+        other_obj = rchoice(self.objects)  # make sure we don't select the same object twice
+        while other_obj == obj:
+            other_obj = rchoice(self.objects)
+        distribution[other_obj] = 1 - distribution[obj]
+        return distribution
 
     def total_penalty(self, state_a, state_b):
         """Calculate the penalty incurred by the transition from state_a to state_b."""
-        def penalty(square_a, square_b):
-            """Using the whitelist counts, calculate penalty for square_a -> square_b."""
-            return self.unknown_cost if square_a != square_b and (square_a, square_b) not in self.whitelist else 0
+        def penalty(square_a, square_b, shift=0):
+            """Using the whitelist average probability shifts, calculate penalty."""
+            if square_a == square_b: return 0
+            if (square_a, square_b) not in self.whitelist: return self.unknown_cost
+            return self.unknown_cost
+            #return max(0, shift - self.whitelist[square_a, square_b]) * self.unknown_cost
 
         return sum([penalty(tile_a, tile_b) for tile_a, tile_b in self.diff(state_a, state_b)])
 
