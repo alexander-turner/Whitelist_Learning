@@ -67,8 +67,9 @@ class VaseWorld:
             return
 
         # Break obstacles if needed (moving from a square with a vase will also break it)
-        if is_obstacle(old_pos) or is_obstacle(new_pos):
-            self.state[tuple(new_pos)] = self.chars['mess']
+        for pos in (old_pos, new_pos):
+            if is_obstacle(pos):
+                self.state[tuple(pos)] = self.chars['mess']
         self.agent_pos = new_pos
 
     def get_reward(self):

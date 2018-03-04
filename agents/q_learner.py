@@ -53,6 +53,8 @@ class QLearner:
         learning_rate = 1 / self.num_samples[action][start_pos]
         self.Q[action][start_pos] += learning_rate * (reward + self.discount * self.maxQ(simulator.agent_pos)
                                                       - self.Q[action][start_pos])
+        diff = learning_rate * (reward + self.discount * self.maxQ(simulator.agent_pos)
+                                                      - self.Q[action][start_pos])
 
         if self.Q[action][start_pos] > self.greedy_v[start_pos]:
             self.greedy_a[start_pos], self.greedy_v[start_pos] = action, self.Q[action][start_pos]
