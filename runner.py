@@ -55,5 +55,5 @@ def run(simulator):
 for challenge in challenges:  # curated showcase
     run(VaseWorld(state=challenge))
 
-for _ in range(1000):  # random showcase
+while round[0] < 1000:  # random showcase
     run(VaseWorld(height=randint(4, 5), width=randint(4, 5), obstacle_chance=(random() + 1) / 4))
