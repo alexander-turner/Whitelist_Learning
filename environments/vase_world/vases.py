@@ -116,33 +116,32 @@ class VaseWorld:
                                      self.tile_size // 10)
                 if prob_state is not None:
                     for key, val in prob_state[coord].items():
-                        self.render_square(row, col, key, alpha=val)
+                        self.render_square(row, col, key, scale=val)
                 else:
                     self.render_square(row, col, self.state[coord])
 
         pygame.display.update()  # update visible display
 
-    def render_square(self, row, col, square, alpha=1):
-        """Load the image, scale it, and put it on the correct tile"""
+    def render_square(self, row, col, square, scale=1):
+        """Load the image, scale it, and put it on the correct tile."""
         if ((row, col) == self.agent_pos).all():
             image = self.resources['W' if self.is_whitelist else 'Q']
+            scale = 1  # know where agent is
         elif square == self.chars['empty']:
             return
         else:
             image = self.resources[square[0]]  # show what's on top
-        if alpha < 1:
-            image.copy().convert()
-            image.set_alpha(alpha * 255)  # set transparency  TODO fix
-        piece_rect = image.get_rect()
+        new_image = pygame.transform.scale(image, (int(self.tile_size * scale), int(self.tile_size * scale)))
+        piece_rect = new_image.get_rect()
         piece_rect.move_ip(self.tile_size * col, self.tile_size * row)  # move in-place
-        self.screen.blit(image, piece_rect)  # draw the tile
+        self.screen.blit(new_image, piece_rect)  # draw the tile
 
     def load_resources(self, path):
         """Load images from the given path."""
         for char in (*self.chars.values(), 'W', 'Q'):  # load each data type
-            if char == self.chars['empty']:  # just draw background as gray and green
+            if char == self.chars['empty']:  # just draw background as gray
                 continue
-            image = pygame.image.load_extended(os.path.join(path, char + '.png')).convert_alpha()
+            image = pygame.image.load_extended(os.path.join(path, char + '.png'))
             self.resources[char] = pygame.transform.scale(image, (self.tile_size, self.tile_size))
 
     def __str__(self):
