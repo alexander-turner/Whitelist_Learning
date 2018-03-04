@@ -11,10 +11,10 @@ class WhitelistLearner(QLearner):
     """A cautious agent that tries not to change the world too much in unknown ways."""
     unknown_cost = 80  # cost of each unknown change effected to the environment
 
-    def __init__(self, simulator, examples):  # TODO make it not retrain on examples each time?
+    def __init__(self, simulator, examples):
         """Takes a series of state representations (training set) and a simulator."""
         # Prepare faux recognition
-        self.recognition_samples = np.random.normal(.7, .005, 50)
+        self.recognition_samples = np.random.normal(1, 0, 50)
         objects, self.other_objects = tuple(simulator.chars.values()), dict.fromkeys(simulator.chars.values())
 
         # Generate second-best recognition candidates - should be roughly same each time a given object is recognized
@@ -84,7 +84,7 @@ class WhitelistLearner(QLearner):
         """Using the whitelist average probability shifts, calculate penalty."""
         if square_a == square_b: return 0
         if (square_a, square_b) not in self.whitelist: return shift * self.unknown_cost
-        return max(0, shift - self.whitelist[square_a, square_b]) * self.unknown_cost  # TODO more sophisticated?
+        return max(0, shift - self.whitelist[square_a, square_b]) * self.unknown_cost
 
     def train(self, simulator):
         while self.num_samples.min() < self.convergence_bound:
@@ -99,7 +99,8 @@ class WhitelistLearner(QLearner):
 
             action = self.e_greedy_action(start_pos)  # choose according to explore/exploit
             reward = simulator.take_action(self.actions[action])
-            self.num_samples[start_pos][action] += 1  # update sample count
+            self.num_samples[action][start_pos] += 1  # update sample count
 
             new_state = self.observe_state(simulator.state)
-            self.update_greedy(start_pos, action, reward - self.total_penalty(old_state, new_state), simulator)
+            penalty = self.total_penalty(old_state, new_state)
+            self.update_greedy(start_pos, action, reward - penalty, simulator)

@@ -9,8 +9,14 @@ from agents.whitelist_learner import WhitelistLearner
 from environments.vase_world.challenges import challenges
 from environments.vase_world.vases import VaseWorld
 
-examples = np.array([[[['_', '_']],  # 2 time steps of a 2x1 VaseWorld is all the whitelist learner needs TODO Clarify
-                      [['_', '_']]]])
+'''
+Although the whitelist isn't necessary simple maze-navigation purposes, try swapping the comments - the learner will be 
+okay breaking crates, but not vases!  # TODO fix
+'''
+examples = np.array([[[['c', '_']],
+                      [['x', '_']]]])
+#examples = np.array([[[['_', '_']],
+#                      [['_', '_']]]])
 
 broken = Counter()
 round = Counter()
@@ -20,16 +26,16 @@ def run(simulator):
     """Run the given VaseWorld state for both learners."""
     for agent in (QLearner(simulator), WhitelistLearner(simulator, examples)):
         simulator.is_whitelist = isinstance(agent, WhitelistLearner)
-        simulator.render(agent.observe_state(simulator.state) if isinstance(agent, WhitelistLearner) else None)
+        simulator.render(agent.observe_state(simulator.state) if simulator.is_whitelist else None)
 
         # Shouldn't take more than w*h steps to complete; ensure whitelist isn't stuck behind obstacles
         while simulator.time_step < simulator.width * simulator.height and not simulator.is_terminal():
             time.sleep(.1)
             simulator.take_action(agent.choose_action(simulator))
-            simulator.render(agent.observe_state(simulator.state) if isinstance(agent, WhitelistLearner) else None)
+            simulator.render(agent.observe_state(simulator.state) if simulator.is_whitelist else None)
 
         broken[agent.__class__] += (simulator.state == simulator.chars['mess']).sum()
-        if not isinstance(agent, WhitelistLearner):  # don't sleep if we're about to train
+        if not simulator.is_whitelist:  # don't sleep if we're about to train
             time.sleep(.5)
         simulator.reset()
     round[0] += 1  # how many levels have we ran?

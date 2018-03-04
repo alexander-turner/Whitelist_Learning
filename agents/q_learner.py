@@ -12,13 +12,14 @@ class QLearner:
         """Trains using the simulator and e-greedy exploration to determine a greedy policy."""
         self.actions = simulator.get_actions()
         self.num_states = simulator.height * simulator.width
-        self.Q = np.zeros((simulator.height, simulator.width, len(self.actions)))
+        self.Q = np.zeros((len(self.actions), simulator.height, simulator.width))
         self.greedy_a, self.greedy_v = np.zeros((simulator.height, simulator.width), int), \
                                        np.full((simulator.height, simulator.width), float('-inf'))
 
-        self.num_samples = np.zeros((simulator.height, simulator.width, len(self.actions)), int)
-        self.num_samples[tuple(simulator.goal_pos)].fill(self.convergence_bound)  # don't bother with goal square
-        self.greedy_v[tuple(simulator.goal_pos)].fill(0)
+        self.num_samples = np.zeros((len(self.actions), simulator.height, simulator.width), int)
+        for ind in range(len(self.actions)):
+            self.num_samples[ind][tuple(simulator.goal_pos)] = self.convergence_bound  # don't bother with goal
+        self.greedy_v[tuple(simulator.goal_pos)] = 0
 
         self.train(simulator)  # let's get to work!
         simulator.reset()  # clean up after ourselves
@@ -34,7 +35,7 @@ class QLearner:
 
             action = self.e_greedy_action(start_pos)  # choose according to explore/exploit
             reward = simulator.take_action(self.actions[action])
-            self.num_samples[start_pos][action] += 1  # update sample count
+            self.num_samples[action][start_pos] += 1  # update sample count
 
             self.update_greedy(start_pos, action, reward, simulator)
 
@@ -49,12 +50,18 @@ class QLearner:
 
     def update_greedy(self, start_pos, action, reward, simulator):
         """Perform TD update on observed reward; update greedy actions and values, if appropriate."""
-        learning_rate = 1 / self.num_samples[start_pos][action]
-        self.Q[start_pos][action] += learning_rate * (reward + self.discount * max(self.Q[tuple(simulator.agent_pos)])
-                                                      - self.Q[start_pos][action])
+        learning_rate = 1 / self.num_samples[action][start_pos]
+        self.Q[action][start_pos] += learning_rate * (reward + self.discount * self.maxQ(simulator.agent_pos)
+                                                      - self.Q[action][start_pos])
 
-        if self.Q[start_pos][action] > self.greedy_v[start_pos]:
-            self.greedy_a[start_pos], self.greedy_v[start_pos] = action, self.Q[start_pos][action]
+        if self.Q[action][start_pos] > self.greedy_v[start_pos]:
+            self.greedy_a[start_pos], self.greedy_v[start_pos] = action, self.Q[action][start_pos]
+
+    def maxQ(self, pos):
+        largest = float('-inf')
+        for ind in range(len(self.actions)):
+            largest = max(largest, self.Q[ind][tuple(pos)])
+        return largest
 
     def choose_action(self, state):
         return self.actions[self.greedy_a[tuple(state.agent_pos)]]
