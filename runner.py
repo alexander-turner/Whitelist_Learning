@@ -18,7 +18,16 @@ okay breaking crates, but not vases!
 examples = np.array([[[['_', '_']],
                       [['_', '_']]]])
 
-broken, clearable, round = Counter(), Counter(), Counter()
+
+# Set up tracking variables
+class MyCounter(Counter):
+    """A print-friendly Counter class."""
+    def __str__(self):
+        return "  ".join('{}: {}'.format(k.__str__(k), v) for k, v in self.items())
+
+
+broken, failed, round = MyCounter(), MyCounter([QLearner, WhitelistLearner]), MyCounter()
+failed[QLearner], failed[WhitelistLearner] = 0, 0
 
 
 def run(simulator):
@@ -34,12 +43,13 @@ def run(simulator):
             simulator.render(agent.observe_state(simulator.state) if simulator.is_whitelist else None)
 
         broken[agent.__class__] += (simulator.state == simulator.chars['mess']).sum()
+        if not simulator.is_terminal() and simulator.clearable:
+            failed[agent.__class__] += 1
         if not simulator.is_whitelist:  # don't sleep if we're about to train
             time.sleep(.5)
         simulator.reset()
     round[0] += 1  # how many levels have we ran?
-    print('\rRound {}. {}'.format(round[0], broken), end='', flush=True)
-    # TODO quantify completion percentage for levels which can be completed without breaking objects
+    print('\rRound {}\nObjects broken | {}\nLevels failed | {}'.format(round[0], broken, failed), end='', flush=True)
 
 
 for challenge in challenges:  # curated showcase

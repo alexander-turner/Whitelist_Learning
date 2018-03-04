@@ -9,7 +9,7 @@ from .q_learner import QLearner
 
 class WhitelistLearner(QLearner):
     """A cautious agent that tries not to change the world too much in unknown ways."""
-    unknown_cost = 80  # cost of each unknown change effected to the environment
+    unknown_cost = 150  # cost of each unknown change effected to the environment
 
     def __init__(self, simulator, examples):
         """Takes a series of state representations (training set) and a simulator."""
@@ -104,3 +104,6 @@ class WhitelistLearner(QLearner):
             new_state = self.observe_state(simulator.state)
             penalty = self.total_penalty(old_state, new_state)
             self.update_greedy(start_pos, action, reward - penalty, simulator)
+
+    def __str__(self):
+        return "Whitelist"

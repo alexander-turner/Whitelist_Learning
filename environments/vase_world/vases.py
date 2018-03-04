@@ -48,6 +48,26 @@ class VaseWorld:
         self.original_agent_pos = self.agent_pos.copy()
         self.original_state = self.state.copy()
 
+        self.clearable = self.check_clearable()
+
+    def check_clearable(self):
+        """Returns true if the level can be cleared without breaking obstacles.
+
+        NOTE: could use bidirectional iterative-deepening / breadth-first, but levels are small, so DFS suffices.
+        """
+        visited, to_visit = set(), [tuple(self.agent_pos)]
+        while to_visit:
+            nxt = to_visit.pop()
+            if nxt not in visited and 0 <= nxt[0] < self.height and 0 <= nxt[1] < self.width and \
+                    self.state[nxt] not in self.obstacles:
+                visited.add(nxt)
+                nxt = np.array(nxt)
+                if (nxt == self.goal_pos).all():
+                    return True
+                to_visit.extend(map(tuple, [nxt + (1, 0), nxt + (-1, 0), nxt + (0, 1), nxt + (0, -1)]))
+
+        return False
+
     def reset(self):
         """Reset the current variation."""
         self.state = self.original_state.copy()

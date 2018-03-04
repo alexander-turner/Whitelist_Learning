@@ -67,3 +67,6 @@ class QLearner:
 
     def choose_action(self, state):
         return self.actions[self.greedy_a[tuple(state.agent_pos)]]
+
+    def __str__(self):
+        return "Q"
