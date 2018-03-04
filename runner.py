@@ -23,7 +23,7 @@ examples = np.array([[[['_', '_']],
 class MyCounter(Counter):
     """A print-friendly Counter class."""
     def __str__(self):
-        return "  ".join('{}: {}'.format(k.__str__(k), v) for k, v in self.items())
+        return " ".join('{}: {}'.format(k.__str__(k), v) for k, v in self.items())
 
 
 broken, failed, round = MyCounter(), MyCounter([QLearner, WhitelistLearner]), MyCounter()
@@ -49,7 +49,7 @@ def run(simulator):
             time.sleep(.5)
         simulator.reset()
     round[0] += 1  # how many levels have we ran?
-    print('\rRound {}\nObjects broken | {}\nLevels failed | {}'.format(round[0], broken, failed), end='', flush=True)
+    print('\rRound {} | Objects broken  {} | Levels failed  {}'.format(round[0], broken, failed), end='', flush=True)
 
 
 for challenge in challenges:  # curated showcase
