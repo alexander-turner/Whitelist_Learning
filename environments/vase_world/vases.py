@@ -60,11 +60,14 @@ class VaseWorld:
 
     def update_agent_pos(self, old_pos, new_pos):
         """@:param new_pos should be a numpy Array."""
+        def is_obstacle(pos):
+            return self.state[tuple(pos)] in self.obstacles
+
         if (old_pos == new_pos).all():  # if we're staying put, do nothing
             return
 
         # Break obstacles if needed (moving from a square with a vase will also break it)
-        if self.state[tuple(old_pos)] in self.obstacles or self.state[tuple(new_pos)] in self.obstacles:
+        if is_obstacle(old_pos) or is_obstacle(new_pos):
             self.state[tuple(new_pos)] = self.chars['mess']
         self.agent_pos = new_pos
 
@@ -129,7 +132,7 @@ class VaseWorld:
             image = self.resources[square[0]]  # show what's on top
         if alpha < 1:
             image.copy().convert()
-            image.set_alpha(alpha * 255)  # set transparency
+            image.set_alpha(alpha * 255)  # set transparency  TODO fix
         piece_rect = image.get_rect()
         piece_rect.move_ip(self.tile_size * col, self.tile_size * row)  # move in-place
         self.screen.blit(image, piece_rect)  # draw the tile

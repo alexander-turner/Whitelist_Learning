@@ -4,9 +4,9 @@ import numpy as np
 
 
 class QLearner:
-    discount = 0.9  # how much it cares about future rewards
-    epsilon = 0.2  # chance of choosing a random action
-    convergence_bound = 320  # minimum number of tries for each (s, a) before terminating
+    discount = 0.95  # how much it cares about future rewards
+    epsilon = 0.3  # chance of choosing a random action
+    convergence_bound = 200  # minimum number of tries for each (s, a) before terminating
 
     def __init__(self, simulator):
         """Trains using the simulator and e-greedy exploration to determine a greedy policy."""
@@ -17,15 +17,19 @@ class QLearner:
                                        np.full((simulator.height, simulator.width), float('-inf'))
 
         self.num_samples = np.zeros((simulator.height, simulator.width, len(self.actions)), int)
+        self.num_samples[tuple(simulator.goal_pos)].fill(self.convergence_bound)  # don't bother with goal square
+        self.greedy_v[tuple(simulator.goal_pos)].fill(0)
 
         self.train(simulator)  # let's get to work!
         simulator.reset()  # clean up after ourselves
 
     def train(self, simulator):
         while self.num_samples.min() < self.convergence_bound:
+            start_pos = randint(0, simulator.height - 1), randint(0, simulator.width - 1)
+            if (start_pos == simulator.goal_pos).all():
+                continue
             # Go to new simulator state and take action
             simulator.reset()
-            start_pos = randint(0, simulator.height - 1), randint(0, simulator.width - 1)
             simulator.agent_pos = np.array(start_pos)
 
             action = self.e_greedy_action(start_pos)  # choose according to explore/exploit
