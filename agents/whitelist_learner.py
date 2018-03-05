@@ -10,11 +10,12 @@ from .q_learner import QLearner
 class WhitelistLearner(QLearner):
     """A cautious agent that tries not to change the world too much in unknown ways."""
     unknown_cost = 150  # cost of each unknown change effected to the environment
+    accuracy_mean, accuracy_deviation = .7, .001
 
     def __init__(self, simulator, examples):
         """Takes a series of state representations (training set) and a simulator."""
         # Prepare faux recognition
-        self.recognition_samples = np.random.normal(.7, .001, 50)
+        self.recognition_samples = np.random.normal(self.accuracy_mean, self.accuracy_deviation, 50)
         objects, self.other_objects = tuple(simulator.chars.values()), dict.fromkeys(simulator.chars.values())
 
         # Generate second-best recognition candidates - should be roughly same each time a given object is recognized

@@ -1,5 +1,7 @@
+import multiprocessing
 import time
 from collections import Counter
+from copy import deepcopy
 from random import random, randint
 
 import numpy as np
@@ -30,14 +32,23 @@ broken, failed, round = MyCounter(), MyCounter([QLearner, WhitelistLearner]), My
 failed[QLearner], failed[WhitelistLearner] = 0, 0
 
 
+def initialize(agent, sim, agents, training=None):
+    """Multiprocessing-compliant agent initalization."""
+    agents.append(agent(sim, training) if training is not None else agent(sim))
+
+
 def run(simulator):
     """Run the given VaseWorld state for both learners."""
-    for agent in (QLearner(simulator), WhitelistLearner(simulator, examples)):
+    with multiprocessing.Pool(processes=2) as pool:
+        agents = []
+        pool.starmap(initialize, ([QLearner, simulator, agents, None],
+                                  [WhitelistLearner, deepcopy(simulator), agents, examples]))
+    for agent in agents:
         simulator.is_whitelist = isinstance(agent, WhitelistLearner)
         simulator.render(agent.observe_state(simulator.state) if simulator.is_whitelist else None)
 
         # Shouldn't take more than w*h steps to complete; ensure whitelist isn't stuck behind obstacles
-        while simulator.time_step < simulator.width * simulator.height and not simulator.is_terminal():
+        while simulator.time_step < simulator.num_squares and not simulator.is_terminal():
             time.sleep(.1)
             simulator.take_action(agent.choose_action(simulator))
             simulator.render(agent.observe_state(simulator.state) if simulator.is_whitelist else None)
@@ -51,9 +62,9 @@ def run(simulator):
     round[0] += 1  # how many levels have we ran?
     print('\rRound {} | Objects broken  {} | Levels failed  {}'.format(round[0], broken, failed), end='', flush=True)
 
+if __name__ == '__main__':
+    for challenge in challenges:  # curated showcase
+        run(VaseWorld(state=challenge))
 
-for challenge in challenges:  # curated showcase
-    run(VaseWorld(state=challenge))
-
-while round[0] < 1000:  # random showcase
-    run(VaseWorld(height=randint(4, 5), width=randint(4, 5), obstacle_chance=(random() + 1) / 4))
+    while round[0] < 1000:  # random showcase
+        run(VaseWorld(height=randint(4, 5), width=randint(4, 5), obstacle_chance=(random() + 1) / 4))
