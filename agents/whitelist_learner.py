@@ -1,54 +1,54 @@
-from collections import Counter, defaultdict
+from collections import defaultdict
 from random import choice as rchoice
 from random import randint
 
 import numpy as np
+from scipy.stats import truncnorm
 
 from .q_learner import QLearner
 
 
+# From https://stackoverflow.com/questions/36894191/how-to-get-a-normal-distribution-within-a-range-in-numpy
+def get_truncated_normal(mean, sd, lower=0, upper=1):
+    return truncnorm((lower - mean) / sd, (upper - mean) / sd, loc=mean, scale=sd)
+
+
 class WhitelistLearner(QLearner):
     """A cautious agent that tries not to change the world too much in unknown ways."""
+    recognition_samples = get_truncated_normal(mean=.7, sd=.05).rvs(50)  # prepare faux recognition
     unknown_cost = 150  # cost of each unknown change effected to the environment
-    accuracy_mean, accuracy_deviation = .7, .001
 
     def __init__(self, simulator, examples):
         """Takes a series of state representations (training set) and a simulator."""
-        # Prepare faux recognition
-        self.recognition_samples = np.random.normal(self.accuracy_mean, self.accuracy_deviation, 50)
-        objects, self.other_objects = tuple(simulator.chars.values()), dict.fromkeys(simulator.chars.values())
-
         # Generate second-best recognition candidates - should be roughly same each time a given object is recognized
-        for key in self.other_objects.keys():
-            self.other_objects[key] = rchoice(objects)
-            if len(objects) > 1:  # make sure there *is* another object we can choose
-                while self.other_objects[key] == key:  # make sure we don't select the same object twice
-                    self.other_objects[key] = rchoice(objects)
+        objects = tuple(simulator.chars.values())
+        self.other_objects = {key: self.get_other(key, objects) for key in objects}
 
         # whitelist[sq, sq_prime] := average prob shift for sq1 -> sq2 during training
-        counts, self.whitelist = Counter(), defaultdict(float)
+        self.whitelist = defaultdict(list)
         for example in examples:
-            old_state = self.observe_state(example[0]).flatten()
+            old_state = self.observe_state(example[0], dynamic=True).flatten()
             for state_b in example[1:]:  # for each of the t-1 transitions
-                new_state = self.observe_state(state_b).flatten()
+                new_state = self.observe_state(state_b, dynamic=True).flatten()
                 for old_dist, new_dist in zip(old_state, new_state):  # for each square's distributions
                     for sq, sq_prime, probability in self.transition_probabilities(old_dist, new_dist):
-                        self.whitelist[sq, sq_prime] += probability
-                        counts[sq, sq_prime] += 1
+                        self.whitelist[sq, sq_prime].append(probability)
                 old_state = new_state
         for key in self.whitelist.keys():
-            self.whitelist[key] /= counts[key]
+            converted = np.array(self.whitelist[key])
+            self.whitelist[key] = converted.mean(), converted.std(), len(converted)
         super().__init__(simulator)  # do normal training
 
-    def recognize(self, obj):
-        """Simulate probabilistic object recognition."""
+    def recognize(self, obj, dynamic=False):
+        """Simulate probabilistic object recognition. If dynamic enabled, randomly generate second-place candidate."""
         distribution = {obj: rchoice(self.recognition_samples)}
-        distribution[self.other_objects[obj]] = 1 - distribution[obj]
+        distribution[self.get_other(obj, tuple(self.other_objects.keys())) if dynamic
+                     else self.other_objects[obj]] = 1 - distribution[obj]
         return distribution
 
-    def observe_state(self, state):
+    def observe_state(self, state, dynamic=False):
         """Uncertain state recognition."""
-        return np.array([[self.recognize(obj) for obj in row] for row in state])
+        return np.array([[self.recognize(obj, dynamic) for obj in row] for row in state])
 
     def transition_probabilities(self, old, new):
         """Get the possible probability shifts between the distributions."""
@@ -71,21 +71,25 @@ class WhitelistLearner(QLearner):
             elif new[key] > old[key]:
                 increases[key] = new[key] - old[key]
         for key, val in new.items():
-            if key not in old:
+            if key not in old and val > 0:
                 increases[key] = val
         return increases, decreases, total_change
 
     def total_penalty(self, state_a, state_b):
         """Calculate the penalty incurred by the transition from state_a to state_b."""
-        return sum([self.penalty(sq, sq_prime, probability)  # TODO background penalty
+        return sum([self.penalty(sq, sq_prime, probability)
                     for dist_a, dist_b in zip(state_a.flatten(), state_b.flatten())
                     for sq, sq_prime, probability in self.transition_probabilities(dist_a, dist_b)])
 
-    def penalty(self, square_a, square_b, shift):
+    def penalty(self, sq, sq_prime, shift):
         """Using the whitelist average probability shifts, calculate penalty."""
-        if square_a == square_b: return 0
-        if (square_a, square_b) not in self.whitelist: return shift * self.unknown_cost
-        return max(0, shift - self.whitelist[square_a, square_b]) * self.unknown_cost
+        if sq == sq_prime: return 0
+        if (sq, sq_prime) not in self.whitelist: return shift * self.unknown_cost
+        # Calculate dissimilarity to distribution of training set transitions
+        dist_above_mean = shift - self.whitelist[sq, sq_prime][0]
+        std_dev = dist_above_mean / max(self.whitelist[sq, sq_prime][1], 1e-10)  # preclude division by 0
+        activation = np.tanh(2*(std_dev - 1.5))  # filter out observational noise, punish outliers steeply
+        return max(0, activation) * shift * self.unknown_cost
 
     def train(self, simulator):
         while self.num_samples.min() < self.convergence_bound:

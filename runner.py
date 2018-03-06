@@ -15,13 +15,11 @@ from environments.vase_world.vases import VaseWorld
 Although the whitelist isn't necessary simple maze-navigation purposes, try swapping the comments - the learner will be 
 okay breaking crates, but not vases! 
 '''
-#examples = np.array([[[['c', '_']],
-#                      [['x', '_']]]])
-examples = np.array([[[['_', '_']],
-                      [['_', '_']]]])
+#examples = np.array([[[['c', 'c', *['_' for _ in range(100)]]],  # TODO fix
+#                      [['x', 'x', *['_' for _ in range(100)]]]]])
+examples = np.array([[[['_', '_', '_', '_', '_', '_', '_']] for _ in range(100)]])  # to capture sensor variance
 
 
-# Set up tracking variables
 class MyCounter(Counter):
     """A print-friendly Counter class."""
     def __str__(self):

@@ -1,3 +1,4 @@
+from random import choice as rchoice
 from random import random, randint
 
 import numpy as np
@@ -41,19 +42,13 @@ class QLearner:
 
     def e_greedy_action(self, pos):
         """Returns the e-greedy action index for the given position."""
-        action = self.greedy_a[pos]
-        if random() < self.epsilon:
-            action = randint(0, len(self.actions) - 1)
-            while action == self.greedy_a[pos]:  # make sure we don't choose the greedy action
-                action = randint(0, len(self.actions) - 1)
-        return action
+        return self.get_other(self.greedy_a[pos], list(range(len(self.actions)))) if random() < self.epsilon \
+            else self.greedy_a[pos]
 
     def update_greedy(self, start_pos, action, reward, simulator):
         """Perform TD update on observed reward; update greedy actions and values, if appropriate."""
         learning_rate = 1 / self.num_samples[action][start_pos]
         self.Q[action][start_pos] += learning_rate * (reward + self.discount * self.maxQ(simulator.agent_pos)
-                                                      - self.Q[action][start_pos])
-        diff = learning_rate * (reward + self.discount * self.maxQ(simulator.agent_pos)
                                                       - self.Q[action][start_pos])
 
         if self.Q[action][start_pos] > self.greedy_v[start_pos]:
@@ -70,3 +65,12 @@ class QLearner:
 
     def __str__(self):
         return "Q"
+
+    @staticmethod
+    def get_other(obj, objects):
+        """Return another object in the Iterable besides the given one."""
+        if len(objects) < 2: return obj  # make sure there *is* another object we can choose
+        other = rchoice(objects)
+        while other == obj:
+            other = rchoice(objects)
+        return other
