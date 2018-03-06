@@ -28,21 +28,16 @@ class MyCounter(Counter):
         return " ".join('{}: {}'.format(k.__str__(k), v) for k, v in self.items())
 
 
-broken, failed, round = MyCounter(), MyCounter([QLearner, WhitelistLearner]), MyCounter()
-failed[QLearner], failed[WhitelistLearner] = 0, 0
-
-
-def initialize(agent, sim, agents, training=None):
-    """Multiprocessing-compliant agent initalization."""
-    agents.append(agent(sim, training) if training is not None else agent(sim))
+def initialize(agent, sim, training=None):
+    """Multiprocessing-compliant agent initialization."""
+    return agent(sim, training) if training is not None else agent(sim)
 
 
 def run(simulator):
     """Run the given VaseWorld state for both learners."""
-    with multiprocessing.Pool(processes=2) as pool:
-        agents = []
-        pool.starmap(initialize, ([QLearner, simulator, agents, None],
-                                  [WhitelistLearner, deepcopy(simulator), agents, examples]))
+    with multiprocessing.Pool(processes=min(2, multiprocessing.cpu_count() - 1)) as pool:
+        agents = pool.starmap(initialize, ([QLearner, simulator, None],
+                                           [WhitelistLearner, deepcopy(simulator), examples]))
     for agent in agents:
         simulator.is_whitelist = isinstance(agent, WhitelistLearner)
         simulator.render(agent.observe_state(simulator.state) if simulator.is_whitelist else None)
@@ -62,7 +57,11 @@ def run(simulator):
     round[0] += 1  # how many levels have we ran?
     print('\rRound {} | Objects broken  {} | Levels failed  {}'.format(round[0], broken, failed), end='', flush=True)
 
+
 if __name__ == '__main__':
+    broken, failed, round = MyCounter(), MyCounter([QLearner, WhitelistLearner]), MyCounter()
+    failed[QLearner], failed[WhitelistLearner] = 0, 0
+
     for challenge in challenges:  # curated showcase
         run(VaseWorld(state=challenge))
 
