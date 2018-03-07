@@ -11,10 +11,9 @@ from agents.whitelist_learner import WhitelistLearner
 from environments.vase_world.challenges import challenges
 from environments.vase_world.vases import VaseWorld
 
-'''Try swapping the comments - the learner will be comfortable breaking crates, but not vases!'''
+break_crates = False  # <== toggle me!
 examples = np.array([[[['c']],
-                      [['x']]]])
-#examples = []
+                      [['x']]]]) if break_crates else []
 whitelist = WhitelistLearner(VaseWorld, do_train=False).get_whitelist(examples)
 
 
@@ -29,25 +28,29 @@ def initialize(agent, sim, training=None):
     return agent(sim, training) if training is not None else agent(sim)
 
 
-def run(simulator):
+def run(simulator, do_render=True):
     """Run the given VaseWorld state for both learners."""
     with multiprocessing.Pool(processes=min(2, multiprocessing.cpu_count() - 1)) as pool:
         agents = pool.starmap(initialize, ([QLearner, simulator, None],
                                            [WhitelistLearner, deepcopy(simulator), whitelist]))
     for agent in agents:
         simulator.is_whitelist = isinstance(agent, WhitelistLearner)
-        simulator.render(agent.observe_state(simulator.state))
 
         # Shouldn't take more than w*h steps to complete; ensure whitelist isn't stuck behind obstacles
         while simulator.time_step < simulator.num_squares and not simulator.is_terminal():
-            time.sleep(.1)
+            if do_render:
+                time.sleep(.1)
+                simulator.render(agent.observe_state(simulator.state))
             simulator.take_action(agent.choose_action(simulator))
+
+        if do_render:
+            time.sleep(.1)
             simulator.render(agent.observe_state(simulator.state))
 
         broken[agent.__class__] += (simulator.state == simulator.chars['mess']).sum()
         if not simulator.is_terminal() and simulator.clearable:
             failed[agent.__class__] += 1
-        if not simulator.is_whitelist:  # don't sleep if we're about to train
+        if do_render and not simulator.is_whitelist:  # don't sleep if we're about to train
             time.sleep(.5)
         simulator.reset()
     round[0] += 1  # how many levels have we ran?

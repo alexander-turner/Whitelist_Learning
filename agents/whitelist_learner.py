@@ -16,7 +16,7 @@ def get_truncated_normal(mean, sd, lower=0, upper=1, samples=50):
 
 class WhitelistLearner(QLearner):
     """A cautious agent that tries not to change the world too much in unknown ways."""
-    recognition_samples = get_truncated_normal(mean=.8, sd=.05)  # prepare faux recognition
+    recognition_samples = get_truncated_normal(mean=.8, sd=.05)  # prepare faux recognition - toggle accuracy, noise
     unknown_cost = 150  # cost of each unknown change effected to the environment
     noise_restarts, noise_time_steps = 10, 10  # how many times to run environment for how many time steps
 
