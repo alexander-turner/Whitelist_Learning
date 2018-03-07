@@ -37,13 +37,13 @@ def run(simulator):
                                            [WhitelistLearner, deepcopy(simulator), examples]))
     for agent in agents:
         simulator.is_whitelist = isinstance(agent, WhitelistLearner)
-        simulator.render(agent.observe_state(simulator.state) if simulator.is_whitelist else None)
+        simulator.render(agent.observe_state(simulator.state))
 
         # Shouldn't take more than w*h steps to complete; ensure whitelist isn't stuck behind obstacles
         while simulator.time_step < simulator.num_squares and not simulator.is_terminal():
             time.sleep(.1)
             simulator.take_action(agent.choose_action(simulator))
-            simulator.render(agent.observe_state(simulator.state) if simulator.is_whitelist else None)
+            simulator.render(agent.observe_state(simulator.state))
 
         broken[agent.__class__] += (simulator.state == simulator.chars['mess']).sum()
         if not simulator.is_terminal() and simulator.clearable:

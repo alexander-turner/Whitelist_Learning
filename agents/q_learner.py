@@ -30,15 +30,25 @@ class QLearner:
             start_pos = randint(0, simulator.height - 1), randint(0, simulator.width - 1)
             if (start_pos == simulator.goal_pos).all():
                 continue
+
             # Go to new simulator state and take action
             simulator.reset()
             simulator.agent_pos = np.array(start_pos)
+            old_state = self.observe_state(simulator.state)
 
             action = self.e_greedy_action(start_pos)  # choose according to explore/exploit
             reward = simulator.take_action(self.actions[action])
+            penalty = self.total_penalty(old_state, self.observe_state(simulator.state))
             self.num_samples[action][start_pos] += 1  # update sample count
 
-            self.update_greedy(start_pos, action, reward, simulator)
+            self.update_greedy(start_pos, action, reward - penalty, simulator)
+
+    def observe_state(self, state):
+        """Learner-specific method for getting observational data from simulator."""
+        return state
+
+    def total_penalty(self, state_a, state_b):
+        return 0
 
     def e_greedy_action(self, pos):
         """Returns the e-greedy action index for the given position."""
