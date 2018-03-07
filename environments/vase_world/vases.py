@@ -114,7 +114,7 @@ class VaseWorld:
         self.time_step += 1
         return self.get_reward() - (0 if action == 'rest' else self.movement_cost)
 
-    def render(self, prob_state=None):
+    def render(self, state):
         if not hasattr(self, 'screen'):
             pygame.init()
             self.tile_size = 50
@@ -135,11 +135,11 @@ class VaseWorld:
                 if (coord == self.goal_pos).all():  # prioritize agent if on top
                     pygame.draw.rect(self.screen, (0, 180, 0), (x, y, self.tile_size, self.tile_size),
                                      self.tile_size // 10)
-                if prob_state is not None:
-                    for key, val in prob_state[coord].items():
+                if not isinstance(state[coord], str):
+                    for key, val in state[coord].items():
                         self.render_square(row, col, key, scale=val)
                 else:
-                    self.render_square(row, col, self.state[coord])
+                    self.render_square(row, col, state[coord])
 
         pygame.display.update()  # update visible display
 

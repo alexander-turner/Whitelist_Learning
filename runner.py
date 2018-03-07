@@ -11,13 +11,12 @@ from agents.whitelist_learner import WhitelistLearner
 from environments.vase_world.challenges import challenges
 from environments.vase_world.vases import VaseWorld
 
-'''
-Try swapping the comments - the learner will be more comfortable breaking crates, but not vases! 
-'''
-#examples = np.array([[[['c', '_']],  # TODO fix
-#                      [['x', '_']]]])
-examples = np.array([[[['_']],
-                      [['_']]]])
+'''Try swapping the comments - the learner will be comfortable breaking crates, but not vases!'''
+examples = np.array([[[['c']],
+                      [['x']]]])
+#examples = []
+whitelist = WhitelistLearner(VaseWorld, do_train=False).get_whitelist(examples)
+
 
 class MyCounter(Counter):
     """A print-friendly Counter class."""
@@ -34,7 +33,7 @@ def run(simulator):
     """Run the given VaseWorld state for both learners."""
     with multiprocessing.Pool(processes=min(2, multiprocessing.cpu_count() - 1)) as pool:
         agents = pool.starmap(initialize, ([QLearner, simulator, None],
-                                           [WhitelistLearner, deepcopy(simulator), examples]))
+                                           [WhitelistLearner, deepcopy(simulator), whitelist]))
     for agent in agents:
         simulator.is_whitelist = isinstance(agent, WhitelistLearner)
         simulator.render(agent.observe_state(simulator.state))

@@ -16,32 +16,29 @@ def get_truncated_normal(mean, sd, lower=0, upper=1, samples=50):
 
 class WhitelistLearner(QLearner):
     """A cautious agent that tries not to change the world too much in unknown ways."""
-    recognition_samples = get_truncated_normal(mean=.7, sd=.01)  # prepare faux recognition
+    recognition_samples = get_truncated_normal(mean=.8, sd=.05)  # prepare faux recognition
     unknown_cost = 150  # cost of each unknown change effected to the environment
     noise_restarts, noise_time_steps = 10, 10  # how many times to run environment for how many time steps
 
-    def __init__(self, simulator, examples=None, whitelist=None):
-        """Takes a series of state representations (training set) and a simulator."""
+    def __init__(self, simulator, whitelist=set([]), do_train=True):
         # Generate second-best recognition candidates - should be roughly same each time a given object is recognized
         self.set_second_choices(simulator)
 
         # Reuse the whitelist if we can
-        self.whitelist = set([])  # TODO refactor
-        if examples is not None and not whitelist:
-            self.expand_whitelist(examples)
-        else:
-            self.whitelist = whitelist
+        self.whitelist = whitelist
 
         # Deduce noise for this simulator environment
-        self.set_noise(simulator)
-        super().__init__(simulator)  # do normal training
+        if do_train:
+            self.set_noise(simulator)
+            super().__init__(simulator)
 
     def set_second_choices(self, simulator):
         """Set second choices for mock classification."""
         objects = tuple(simulator.chars.values())
         self.other_objects = {key: self.get_other(key, objects) for key in objects}
 
-    def expand_whitelist(self, examples):
+    def get_whitelist(self, examples, whitelist=set([])):
+        """Extend / create a whitelist by classifying observed transitions in examples (lists of percept histories)."""
         for example in examples:
             old_state = self.observe_state(example[0]).flatten()
             for state_b in example[1:]:  # for each of the t-1 transitions
@@ -49,18 +46,20 @@ class WhitelistLearner(QLearner):
                 for old_dist, new_dist in zip(old_state, new_state):  # classify each square
                     sq, sq_prime = self.classify(old_dist), self.classify(new_dist)
                     if sq != sq_prime:
-                        self.whitelist.add((sq, sq_prime))
+                        whitelist.add((sq, sq_prime))  # make assumption that classifier right - human can verify
                 old_state = new_state
+        return whitelist
 
-    def recognize(self, obj):
+    def recognize(self, obj, dynamic=False):
         """Simulate probabilistic object recognition. If dynamic enabled, randomly generate second-place candidate."""
         distribution = {obj: rchoice(self.recognition_samples)}
-        distribution[self.other_objects[obj]] = 1 - distribution[obj]
+        distribution[self.get_other(obj, tuple(self.other_objects.keys())) if dynamic
+                     else self.other_objects[obj]] = 1 - distribution[obj]
         return distribution
 
-    def observe_state(self, state):
+    def observe_state(self, state, dynamic=False):
         """Uncertain state recognition."""
-        return np.array([[self.recognize(obj) for obj in row] for row in state])
+        return np.array([[self.recognize(obj, dynamic) for obj in row] for row in state])
 
     @staticmethod
     def classify(dist):
@@ -70,7 +69,6 @@ class WhitelistLearner(QLearner):
     def transition_probabilities(self, old, new):
         """Get the possible probability shifts between the distributions."""
         increases, decreases, total_change = self.group_deltas(old, new)
-
         return [(sq, sq_prime, decrease * increase / total_change)
                 for sq, decrease in decreases.items()  # how much probability mass did sq lose?
                 for sq_prime, increase in increases.items()]  # and where could it have gone?
@@ -94,10 +92,10 @@ class WhitelistLearner(QLearner):
         """Learn environment-specific noise distributions at rest (\pi_{null} or \pi_{safe})."""
         self.noise = defaultdict(list)
         for _ in range(self.noise_restarts):
-            old_state = self.observe_state(simulator.state).flatten()
+            old_state = self.observe_state(simulator.state, dynamic=True).flatten()
             for t in range(self.noise_time_steps):
                 simulator.take_action('rest')
-                new_state = self.observe_state(simulator.state).flatten()
+                new_state = self.observe_state(simulator.state, dynamic=True).flatten()
                 for old_dist, new_dist in zip(old_state, new_state):  # for each square's distributions
                     for sq, sq_prime, probability in self.transition_probabilities(old_dist, new_dist):
                         self.noise[sq, sq_prime].append(probability)
@@ -110,7 +108,6 @@ class WhitelistLearner(QLearner):
 
     def total_penalty(self, state_a, state_b):
         """Calculate the penalty incurred by the transition from state_a to state_b."""
-        
         return sum([self.penalty(sq, sq_prime, probability)
                     for dist_a, dist_b in zip(state_a.flatten(), state_b.flatten())
                     for sq, sq_prime, probability in self.transition_probabilities(dist_a, dist_b)])
@@ -123,7 +120,7 @@ class WhitelistLearner(QLearner):
         # Compensate for observational noise in this specific environment
         dist_above_mean = shift - self.noise[sq, sq_prime][0]
         std_dev = dist_above_mean / max(self.noise[sq, sq_prime][1], 1e-10)  # preclude division by 0
-        activation = np.tanh(2*(std_dev - 1.5))  # filter out observational noise, punish outliers steeply
+        activation = np.tanh(std_dev - 3)  # filter out observational noise
         return max(0, activation) * shift * self.unknown_cost
 
     def __str__(self):
