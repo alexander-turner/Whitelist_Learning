@@ -9,18 +9,20 @@ from .q_learner import QLearner
 
 
 # From https://stackoverflow.com/questions/36894191/how-to-get-a-normal-distribution-within-a-range-in-numpy
-def get_truncated_normal(mean, sd, lower=0, upper=1, samples=50):
+def get_truncated_normal(mean, sd, lower=0, upper=1, samples=100):
     sd = max(sd, 1e-10)  # make sure we can't divide by 0
     return truncnorm((lower - mean) / sd, (upper - mean) / sd, loc=mean, scale=sd).rvs(samples)
 
 
 class WhitelistLearner(QLearner):
     """A cautious agent that tries not to change the world too much in unknown ways."""
-    recognition_samples = get_truncated_normal(mean=.8, sd=.05)  # prepare faux recognition - toggle accuracy, noise
     unknown_cost = 150  # cost of each unknown change effected to the environment
     noise_restarts, noise_time_steps = 10, 10  # how many times to run environment for how many time steps
 
     def __init__(self, simulator, whitelist=set([]), do_train=True):
+        # Prepare faux recognition - toggle accuracy, noise
+        self.recognition_samples = get_truncated_normal(mean=.8, sd=.05)
+
         # Generate second-best recognition candidates - should be roughly same each time a given object is recognized
         self.set_second_choices(simulator)
 
