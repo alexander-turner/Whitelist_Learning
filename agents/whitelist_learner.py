@@ -19,7 +19,7 @@ class WhitelistLearner(QLearner):
     unknown_cost = 150  # cost of each unknown change effected to the environment
     noise_restarts, noise_time_steps = 10, 10  # how many times to run environment for how many time steps
 
-    def __init__(self, simulator, whitelist=set([]), mean=.8, sd=.05, do_train=True):
+    def __init__(self, simulator, whitelist=set([]), sd=.05, mean=.8, do_train=True):
         # Prepare faux recognition - toggle accuracy, noise
         self.recognition_samples = get_truncated_normal(mean, sd)
 

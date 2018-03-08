@@ -23,20 +23,27 @@ class MyCounter(Counter):
         return " ".join('{}: {}'.format(k.__str__(k), v) for k, v in self.items())
 
 
-def initialize(agent, sim, training=None):
+def initialize(agent, sim, training=None, sd=.05):
     """Multiprocessing-compliant agent initialization."""
-    return agent(sim, training) if training is not None else agent(sim)
+    return agent(sim, training, sd=sd) if training is not None else agent(sim)
 
 
-def run(simulator, do_render=True):
+def run(simulator=None, use_q_learner=True, do_render=True, sd=.05):
     """Run the given VaseWorld state for both learners."""
-    with multiprocessing.Pool(processes=min(2, multiprocessing.cpu_count() - 1)) as pool:
-        agents = pool.starmap(initialize, ([QLearner, simulator, None],
-                                           [WhitelistLearner, deepcopy(simulator), whitelist]))
+    if simulator is None:
+        simulator = VaseWorld(height=randint(4, 5), width=randint(4, 5), obstacle_chance=(random() + 1) / 4)
+    # Train the agents
+    if use_q_learner:
+        with multiprocessing.Pool(processes=min(2, multiprocessing.cpu_count() - 1)) as pool:
+            agents = pool.starmap(initialize, ([QLearner, simulator],
+                                               [WhitelistLearner, deepcopy(simulator), whitelist, sd]))
+    else:
+        agents = (WhitelistLearner(simulator, whitelist, sd=sd),)
+
     for agent in agents:
         simulator.is_whitelist = isinstance(agent, WhitelistLearner)
 
-        # Shouldn't take more than w*h steps to complete; ensure whitelist isn't stuck behind obstacles
+        # Shouldn't take more than w*h steps to complete - ensure whitelist isn't stuck behind obstacles
         while simulator.time_step < simulator.num_squares and not simulator.is_terminal():
             if do_render:
                 time.sleep(.1)
@@ -62,7 +69,7 @@ if __name__ == '__main__':
     failed[QLearner], failed[WhitelistLearner] = 0, 0
 
     for challenge in challenges:  # curated showcase
-        run(VaseWorld(state=challenge))
+        run(simulator=VaseWorld(state=challenge))
 
     while round[0] < 1000:  # random showcase
-        run(VaseWorld(height=randint(4, 5), width=randint(4, 5), obstacle_chance=(random() + 1) / 4))
+        run()
