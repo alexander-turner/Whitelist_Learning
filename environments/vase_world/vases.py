@@ -76,7 +76,7 @@ class VaseWorld:
 
     @staticmethod
     def get_actions():
-        return 'up', 'left', 'right', 'down', 'rest'
+        return 'up', 'left', 'right', 'down', None
 
     def update_agent_pos(self, old_pos, new_pos):
         """@:param new_pos should be a numpy Array."""
@@ -112,7 +112,7 @@ class VaseWorld:
         self.update_agent_pos(old_pos, self.agent_pos)
 
         self.time_step += 1
-        return self.get_reward() - (0 if action == 'rest' else self.movement_cost)
+        return self.get_reward() - (0 if action is None else self.movement_cost)
 
     def render(self, state):
         if not hasattr(self, 'screen'):
