@@ -125,7 +125,7 @@ class VaseWorld:
             if len(self.resources) == 0:
                 self.load_resources("environments\\vase_world\\resources")
         pygame.event.clear()  # allows for pausing and debugging without losing rendering capability
-        self.screen.fill((200, 200, 200))
+        self.screen.fill((220, 220, 220))
 
         for row in range(self.height):
             for col in range(self.width):

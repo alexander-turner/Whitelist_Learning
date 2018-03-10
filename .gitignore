@@ -4,3 +4,4 @@
 *.pyc
 *.xml
 .idea/vcs.xml
+*.eps

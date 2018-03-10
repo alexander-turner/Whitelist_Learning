@@ -28,10 +28,11 @@ def initialize(agent, sim, training=None, sd=.05):
     return agent(sim, training, sd=sd) if training is not None else agent(sim)
 
 
-def run(simulator=None, use_q_learner=True, do_render=True, sd=.05):
+def run(broken, failed, round, simulator=None, use_q_learner=True, do_render=True, sd=.025):
     """Run the given VaseWorld state for both learners."""
     if simulator is None:
         simulator = VaseWorld(height=randint(4, 5), width=randint(4, 5), obstacle_chance=(random() + 1) / 4)
+
     # Train the agents
     if use_q_learner:
         with multiprocessing.Pool(processes=min(2, multiprocessing.cpu_count() - 1)) as pool:
@@ -69,7 +70,7 @@ if __name__ == '__main__':
     failed[QLearner], failed[WhitelistLearner] = 0, 0
 
     for challenge in challenges:  # curated showcase
-        run(simulator=VaseWorld(state=challenge))
+        run(broken, failed, round, simulator=VaseWorld(state=challenge))
 
     while round[0] < 1000:  # random showcase
-        run()
+        run(broken, failed, round)
