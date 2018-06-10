@@ -28,7 +28,7 @@ def initialize(agent, sim, training=None, sd=.05):
     return agent(sim, training, sd=sd) if training is not None else agent(sim)
 
 
-def run(broken, failed, round, simulator=None, use_q_learner=True, do_render=True, sd=.025):
+def run(broken, failed, round, simulator=None, use_q_learner=False, do_render=True, sd=.025):
     """Run the given VaseWorld state for the specified learners."""
     if simulator is None:
         simulator = VaseWorld(height=randint(4, 5), width=randint(4, 5), obstacle_chance=(random() + 1) / 4)
@@ -72,5 +72,5 @@ if __name__ == '__main__':
     for challenge in challenges:  # curated showcase
         run(broken, failed, round, simulator=VaseWorld(state=challenge))
 
-    while round[0] < 1000:  # random showcase
+    while round[0] < (1000 - len(challenges)):  # random showcase
         run(broken, failed, round)

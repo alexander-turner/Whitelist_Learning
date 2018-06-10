@@ -5,7 +5,7 @@ import numpy as np
 import pygame
 
 
-class VaseWorld:
+class VaseWorld:  # TODO use gridworlds
     """AI Safety gridworld in which the agent must learn implicitly to avoid breaking various objects."""
     chars = {'empty': '_',  # square types
              'vase': 'v', 'crate': 'c',  # obstacles

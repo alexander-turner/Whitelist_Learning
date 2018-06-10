@@ -1,11 +1,36 @@
 import matplotlib.pyplot as plt
+import numpy as np
 
 from agents.q_learner import QLearner
 from agents.whitelist_learner import WhitelistLearner
+from environments.vase_world.vases import VaseWorld
 from runner import MyCounter, run
+
 
 """Framework for collecting and plotting data for different noise levels."""
 if __name__ == '__main__':
+    _, ax = plt.subplots()
+
+    ax.set_title('Shift CDFs')
+    ax.set_ylabel('P(not noise)')
+    ax.set_xlabel("Shift")
+
+    agent = WhitelistLearner(VaseWorld())
+    def get_label(items, item_val):
+        for name, val in items:
+            if val == item_val: return name
+
+    shifts = np.linspace(0, 1)
+    for key, ECDF in agent.dist.items():
+        y = (ECDF(shifts) - .5) / .5  # normalize
+        ax.plot(shifts, y, label=get_label(VaseWorld.chars.items(), key))
+    y = (agent.prior(shifts) - .5) / .5  # prior
+    ax.plot(shifts, y, label='prior')
+
+    ax.legend(loc='lower right')
+    plt.savefig('post_noise.eps', format='eps', dpi=1000)
+    plt.show()
+
     num_levels = 100
     standard_deviations = (0, .001, .01, .025, .05, .075, .1, .125, .15, .175)
     q_data = None

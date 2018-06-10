@@ -1,2 +1,5 @@
 numpy==1.13.0
 pygame==1.9.3
+statsmodels
+pandas==0.14
+patsy==0.3

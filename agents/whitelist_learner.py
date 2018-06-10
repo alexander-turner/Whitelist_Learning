@@ -1,9 +1,10 @@
 import operator
-from collections import defaultdict
-from random import choice as rchoice
-
 import numpy as np
+from collections import defaultdict
+from functools import partial
+from random import choice as rchoice
 from scipy import stats
+from statsmodels.distributions.empirical_distribution import ECDF
 
 from .q_learner import QLearner
 
@@ -23,14 +24,15 @@ class WhitelistLearner(QLearner):
         # Prepare faux recognition - toggle confidence, noise
         self.recognition_samples = get_truncated_normal(mean, sd)
 
-        # Inv-Gamma prior says smaller variances are more likely
-        self.alpha, self.beta = 3, .5
-        self.posterior = defaultdict()
-        self.cdf = defaultdict()
-
         # Generate second-best recognition candidates - should be roughly same each time a given object is recognized
         self.set_second_choices(simulator)
         self.whitelist = whitelist  # reuse the whitelist if we can
+
+        # Inv-Gamma prior says smaller variances are somewhat more likely
+        self.alpha, self.beta = 3, .5
+        self.prior = ECDF(stats.t.rvs(df=2 * self.alpha, loc=0, scale=np.sqrt(2 * self.beta / self.alpha), size=10000))
+        self.posterior = defaultdict()
+        self.dist = defaultdict()
 
         if do_train:
             self.set_noise(simulator)  # deduce noise for this simulator environment
@@ -105,29 +107,22 @@ class WhitelistLearner(QLearner):
             simulator.reset()
 
         # Merge noise for values across object identities (e.g. more than one vase - merge noise for both vases)
-        merged_noise = defaultdict(list)  # TODO smooth out typing
+        merged_noise = defaultdict(partial(np.ndarray, 1))
         for key in noise.keys():
             converted = np.array(noise[key])
-            merged_noise[key[1]].extend((converted - converted.mean()).tolist())
+            merged_noise[key[1]] = np.append(merged_noise[key[1]], converted - converted.mean())
         for key in merged_noise.keys():
-            converted = np.array(merged_noise[key])
-            self.posterior[key] = self.alpha + len(converted)/2, self.beta + converted.var()/2
-        self.update_cdf()
+            self.posterior[key] = self.alpha + len(merged_noise[key])/2, self.beta + merged_noise[key].var()/2
+        self.update_dist()
 
-    def update_cdf(self):
-        """Regenerate the cached CDF values based on self.posterior (assumes all keys present)."""
-        for key in self.posterior.keys():
-            for i in range(0, 21):  # i/20
-                # std = sqrt(2*var(=beta'/alpha')) (since shift is two draws from t)
-                # Normalize (/.5) since half of prob mass is below mean of t-dist, and all shifts are positive
-                self.cdf[key, i] = (stats.t.cdf(i/20, df=2 * self.posterior[key][0], loc=0,
-                                                scale=np.sqrt(2 * self.posterior[key][1] / self.posterior[key][0]))
-                                    - .5) / .5
+    def update_dist(self):
+        """Regenerate the cached empirical distributions based on self.posterior (assumes all keys present)."""
+        for key, (alpha, beta) in self.posterior.items():
+            self.dist[key] = ECDF(stats.t.rvs(df=2 * alpha, loc=0, scale=np.sqrt(2 * beta / alpha), size=10000))
 
     def get_noise(self, sq, sq_prime, shift):
         """Using learned noise distributions, return P(shift is not noise)."""
-        rounded = round(shift*20)
-        return self.cdf[sq, rounded] * self.cdf[sq_prime, rounded]
+        return ((self.dist[sq](shift) - .5) / .5) * ((self.dist[sq_prime](shift) - .5) / .5)  # normalize on positive density
 
     def total_penalty(self, state_a, state_b):
         """Calculate the penalty incurred by the transition from state_a to state_b."""
@@ -138,10 +133,8 @@ class WhitelistLearner(QLearner):
     def penalty(self, sq, sq_prime, shift):
         """Using the whitelist average probability shifts, calculate penalty."""
         if sq == sq_prime or (sq, sq_prime) in self.whitelist: return 0
-
-        # Compensate for observational noise in this specific environment
-        prob = self.get_noise(sq, sq_prime, shift)
-        return prob**2 * shift * self.unknown_cost
+        prob = self.get_noise(sq, sq_prime, shift)  # compensate for observational noise in this specific environment
+        return prob**3 * shift * self.unknown_cost
 
     def __str__(self):
         return "Whitelist"
