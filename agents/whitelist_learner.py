@@ -3,7 +3,7 @@ from collections import defaultdict
 from random import choice as rchoice
 
 import numpy as np
-from scipy.stats import truncnorm
+from scipy import stats
 
 from .q_learner import QLearner
 
@@ -11,7 +11,7 @@ from .q_learner import QLearner
 # From https://stackoverflow.com/questions/36894191/how-to-get-a-normal-distribution-within-a-range-in-numpy
 def get_truncated_normal(mean, sd, lower=0, upper=1, samples=100):
     sd = max(sd, 1e-10)  # make sure we can't divide by 0
-    return truncnorm((lower - mean) / sd, (upper - mean) / sd, loc=mean, scale=sd).rvs(samples)
+    return stats.truncnorm((lower - mean) / sd, (upper - mean) / sd, loc=mean, scale=sd).rvs(samples)
 
 
 class WhitelistLearner(QLearner):
@@ -89,21 +89,42 @@ class WhitelistLearner(QLearner):
 
     def set_noise(self, simulator):
         """Learn environment-specific noise distributions at rest (\pi_{null} or \pi_{safe})."""
-        self.noise = defaultdict(list)
+        # Inv-Gamma prior says smaller variances are more likely
+        self.alpha, self.beta = 3, .5
+        self.posterior = defaultdict()
+
+        noise = defaultdict(list)
         for _ in range(self.noise_restarts):
-            old_state = self.observe_state(simulator.state, dynamic=True).flatten()
             for t in range(self.noise_time_steps):
+                state = self.observe_state(simulator.state, dynamic=True).flatten()
+                for obj_ind, dist in enumerate(state):
+                    for key in dist.keys():
+                        noise[obj_ind, key].append(dist[key])
                 simulator.take_action(None)
-                new_state = self.observe_state(simulator.state, dynamic=True).flatten()
-                for old_dist, new_dist in zip(old_state, new_state):  # for each square's distributions
-                    for sq, sq_prime, shift in self.transition_shifts(old_dist, new_dist):
-                        self.noise[sq, sq_prime].append(shift)
-                old_state = new_state
             simulator.reset()
 
-        for key in self.noise.keys():
-            converted = np.array(self.noise[key])
-            self.noise[key] = converted.mean(), converted.std()
+        # Merge noise for values across object identities (e.g. more than one vase - merge noise for both vases)
+        merged_noise = defaultdict(list)  # TODO smooth out typing
+        for key in noise.keys():
+            converted = np.array(noise[key])
+            merged_noise[key[1]].extend((converted - converted.mean()).tolist())
+        for key in merged_noise.keys():
+            converted = np.array(merged_noise[key])
+            self.posterior[key] = self.alpha + len(converted)/2, self.beta + converted.var()/2
+
+    def get_noise(self, sq, sq_prime, shift):
+        prob = 1  # P(not noise)
+        for val in (sq, sq_prime):
+            params = self.alpha, self.beta  # default to priors
+            if val in self.posterior:
+                params = self.posterior[val]
+            # How unusual shift was; 2beta'/alpha' (since shift is two draws from t)
+            # (Normalize (/.5) since half of prob mass is below mean of t-dist, and all shifts are positive)
+            prob *= (stats.t.cdf(shift, df=2*params[0], loc=0, scale=np.sqrt(2*params[1]/params[0])) - .5) * 2
+
+            x = np.arange(-1,1,.05)
+            fit = stats.t.pdf(x,df=2*params[0], loc=0, scale=np.sqrt(2*params[1]/params[0]))
+        return prob
 
     def total_penalty(self, state_a, state_b):
         """Calculate the penalty incurred by the transition from state_a to state_b."""
@@ -114,12 +135,9 @@ class WhitelistLearner(QLearner):
     def penalty(self, sq, sq_prime, shift):
         """Using the whitelist average probability shifts, calculate penalty."""
         if sq == sq_prime or (sq, sq_prime) in self.whitelist: return 0
-        if (sq, sq_prime) not in self.noise: return shift * self.unknown_cost
 
         # Compensate for observational noise in this specific environment
-        dist_above_mean = shift - self.noise[sq, sq_prime][0]
-        sd = dist_above_mean / max(self.noise[sq, sq_prime][1], 1e-10)  # preclude division by 0
-        activation = np.tanh(sd - 3)  # filter out observational noise
+        activation = np.tanh(self.get_noise(sq, sq_prime, shift))  # filter out observational noise
         return max(0, activation) * shift * self.unknown_cost
 
     def __str__(self):
