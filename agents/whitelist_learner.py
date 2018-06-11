@@ -23,6 +23,11 @@ class WhitelistLearner(QLearner):
         # Prepare faux recognition - toggle confidence, noise
         self.recognition_samples = get_truncated_normal(mean, sd)
 
+        # Inv-Gamma prior says smaller variances are more likely
+        self.alpha, self.beta = 3, .5
+        self.posterior = defaultdict()
+        self.cdf = defaultdict()
+
         # Generate second-best recognition candidates - should be roughly same each time a given object is recognized
         self.set_second_choices(simulator)
         self.whitelist = whitelist  # reuse the whitelist if we can
@@ -89,10 +94,6 @@ class WhitelistLearner(QLearner):
 
     def set_noise(self, simulator):
         """Learn environment-specific noise distributions at rest (\pi_{null} or \pi_{safe})."""
-        # Inv-Gamma prior says smaller variances are more likely
-        self.alpha, self.beta = 3, .5
-        self.posterior = defaultdict()
-
         noise = defaultdict(list)
         for _ in range(self.noise_restarts):
             for t in range(self.noise_time_steps):
@@ -111,20 +112,22 @@ class WhitelistLearner(QLearner):
         for key in merged_noise.keys():
             converted = np.array(merged_noise[key])
             self.posterior[key] = self.alpha + len(converted)/2, self.beta + converted.var()/2
+        self.update_cdf()
+
+    def update_cdf(self):
+        """Regenerate the cached CDF values based on self.posterior (assumes all keys present)."""
+        for key in self.posterior.keys():
+            for i in range(0, 21):  # i/20
+                # std = sqrt(2*var(=beta'/alpha')) (since shift is two draws from t)
+                # Normalize (/.5) since half of prob mass is below mean of t-dist, and all shifts are positive
+                self.cdf[key, i] = (stats.t.cdf(i/20, df=2 * self.posterior[key][0], loc=0,
+                                                scale=np.sqrt(2 * self.posterior[key][1] / self.posterior[key][0]))
+                                    - .5) / .5
 
     def get_noise(self, sq, sq_prime, shift):
-        prob = 1  # P(not noise)
-        for val in (sq, sq_prime):
-            params = self.alpha, self.beta  # default to priors
-            if val in self.posterior:
-                params = self.posterior[val]
-            # How unusual shift was; 2beta'/alpha' (since shift is two draws from t)
-            # (Normalize (/.5) since half of prob mass is below mean of t-dist, and all shifts are positive)
-            prob *= (stats.t.cdf(shift, df=2*params[0], loc=0, scale=np.sqrt(2*params[1]/params[0])) - .5) * 2
-
-            x = np.arange(-1,1,.05)
-            fit = stats.t.pdf(x,df=2*params[0], loc=0, scale=np.sqrt(2*params[1]/params[0]))
-        return prob
+        """Using learned noise distributions, return P(shift is not noise)."""
+        rounded = round(shift*20)
+        return self.cdf[sq, rounded] * self.cdf[sq_prime, rounded]
 
     def total_penalty(self, state_a, state_b):
         """Calculate the penalty incurred by the transition from state_a to state_b."""
@@ -137,8 +140,8 @@ class WhitelistLearner(QLearner):
         if sq == sq_prime or (sq, sq_prime) in self.whitelist: return 0
 
         # Compensate for observational noise in this specific environment
-        activation = np.tanh(self.get_noise(sq, sq_prime, shift))  # filter out observational noise
-        return max(0, activation) * shift * self.unknown_cost
+        prob = self.get_noise(sq, sq_prime, shift)
+        return prob**2 * shift * self.unknown_cost
 
     def __str__(self):
         return "Whitelist"
