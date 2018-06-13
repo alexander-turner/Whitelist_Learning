@@ -30,7 +30,7 @@ class WhitelistLearner(QLearner):
 
         # Inv-Gamma prior says smaller variances are somewhat more likely
         self.alpha, self.beta = 3, .5
-        self.prior = ECDF(stats.t.rvs(df=2 * self.alpha, loc=0, scale=np.sqrt(2 * self.beta / self.alpha), size=10000))
+        self.prior = ECDF(stats.t.rvs(df=2 * self.alpha, loc=0, scale=np.sqrt(self.beta / self.alpha), size=10000))
         self.posterior = defaultdict()
         self.dist = defaultdict()
 
@@ -41,7 +41,7 @@ class WhitelistLearner(QLearner):
     def set_second_choices(self, simulator):
         """Set second choices for mock classification."""
         objects = tuple(simulator.chars.values())
-        self.other_objects = {key: self.get_other(key, objects) for key in objects}
+        self.other_objects = {key: self.get_other(key, objects) for key in objects}  # TODO expand to four
 
     def get_whitelist(self, examples, whitelist=set([])):
         """Extend / create a whitelist by classifying observed transitions in examples (lists of percept histories)."""
@@ -112,17 +112,20 @@ class WhitelistLearner(QLearner):
             converted = np.array(noise[key])
             merged_noise[key[1]] = np.append(merged_noise[key[1]], converted - converted.mean())
         for key in merged_noise.keys():
-            self.posterior[key] = self.alpha + len(merged_noise[key])/2, self.beta + merged_noise[key].var()/2
+            n = len(merged_noise[key])
+            # One n to get back to sum of squared errors, another for sample var correction
+            self.posterior[key] = self.alpha + n/2, self.beta + n * n * merged_noise[key].var()/(2*(n-1))
         self.update_dist()
 
     def update_dist(self):
         """Regenerate the cached empirical distributions based on self.posterior (assumes all keys present)."""
         for key, (alpha, beta) in self.posterior.items():
-            self.dist[key] = ECDF(stats.t.rvs(df=2 * alpha, loc=0, scale=np.sqrt(2 * beta / alpha), size=10000))
+            self.dist[key] = ECDF(stats.t.rvs(df=2 * alpha, loc=0, scale=np.sqrt(beta / alpha), size=1000))
 
     def get_noise(self, sq, sq_prime, shift):
         """Using learned noise distributions, return P(shift is not noise)."""
-        return ((self.dist[sq](shift) - .5) / .5) * ((self.dist[sq_prime](shift) - .5) / .5)  # normalize on positive density
+        shift_prime = shift/np.sqrt(2)
+        return ((self.dist[sq](shift_prime) - .5) / .5) * ((self.dist[sq_prime](shift_prime) - .5) / .5)  # normalize on positive density
 
     def total_penalty(self, state_a, state_b):
         """Calculate the penalty incurred by the transition from state_a to state_b."""
@@ -134,7 +137,7 @@ class WhitelistLearner(QLearner):
         """Using the whitelist average probability shifts, calculate penalty."""
         if sq == sq_prime or (sq, sq_prime) in self.whitelist: return 0
         prob = self.get_noise(sq, sq_prime, shift)  # compensate for observational noise in this specific environment
-        return prob**3 * shift * self.unknown_cost
+        return prob**5 * shift * self.unknown_cost
 
     def __str__(self):
         return "Whitelist"

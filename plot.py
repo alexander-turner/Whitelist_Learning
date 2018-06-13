@@ -11,20 +11,21 @@ from runner import MyCounter, run
 if __name__ == '__main__':
     _, ax = plt.subplots()
 
-    ax.set_title('Shift CDFs')
+    ax.set_title('Shift CDFs (actual noise σ=.05)')
     ax.set_ylabel('P(not noise)')
     ax.set_xlabel("Shift")
 
-    agent = WhitelistLearner(VaseWorld())
+    agent = WhitelistLearner(VaseWorld(), sd=.05)
     def get_label(items, item_val):
         for name, val in items:
             if val == item_val: return name
 
     shifts = np.linspace(0, 1)
     for key, ECDF in agent.dist.items():
-        y = (ECDF(shifts) - .5) / .5  # normalize
+        print(key, agent.posterior[key][1] / agent.posterior[key][0])  # var  TODO include
+        y = (ECDF(shifts/np.sqrt(2)) - .5) / .5  # normalize
         ax.plot(shifts, y, label=get_label(VaseWorld.chars.items(), key))
-    y = (agent.prior(shifts) - .5) / .5  # prior
+    y = (agent.prior(shifts/np.sqrt(2)) - .5) / .5  # prior
     ax.plot(shifts, y, label='prior')
 
     ax.legend(loc='lower right')
@@ -32,9 +33,9 @@ if __name__ == '__main__':
     plt.show()
 
     num_levels = 100
-    standard_deviations = (0, .001, .01, .025, .05, .075, .1, .125, .15, .175)
-    q_data = None
-    whitelist_data = {}
+    standard_deviations = (0, .001, .01, .025, .05, .075, .1, .125, .15, .175)  #
+    q_data = 74, 0  # None
+    whitelist_data = {0: (0, 0), .001: (0, 0), .01: (0, 0), .025: (0, 0), .05: (0, 0), .075: (0, 2)}  # 0 0 0 0 (start from .05)
 
     for sd in standard_deviations:
         print("Noise level: {}".format(sd))
@@ -47,6 +48,8 @@ if __name__ == '__main__':
             q_data = broken[QLearner], failed[QLearner]  # only generate for first noise condition
         whitelist_data[sd] = broken[WhitelistLearner], failed[WhitelistLearner]
         print()
+
+    print(q_data, whitelist_data)
 
     def set_up_plots():
         _, ax = plt.subplots()
