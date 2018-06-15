@@ -29,7 +29,7 @@ class WhitelistLearner(QLearner):
         self.whitelist = whitelist  # reuse the whitelist if we can
 
         # Inv-Gamma prior says smaller variances are somewhat more likely
-        self.alpha, self.beta = 3, .5
+        self.alpha, self.beta = 3, .1
         self.prior = ECDF(stats.t.rvs(df=2 * self.alpha, loc=0, scale=np.sqrt(self.beta / self.alpha), size=10000))
         self.posterior = defaultdict()
         self.dist = defaultdict()
@@ -112,9 +112,9 @@ class WhitelistLearner(QLearner):
             converted = np.array(noise[key])
             merged_noise[key[1]] = np.append(merged_noise[key[1]], converted - converted.mean())
         for key in merged_noise.keys():
-            n = len(merged_noise[key])
+            n = len(merged_noise[key][1:])  # for some reason, first index has garbage value
             # One n to get back to sum of squared errors, another for sample var correction
-            self.posterior[key] = self.alpha + n/2, self.beta + n * n * merged_noise[key].var()/(2*(n-1))
+            self.posterior[key] = self.alpha + n/2, self.beta + n * n * merged_noise[key][1:].var()/(2*(n-1))
         self.update_dist()
 
     def update_dist(self):
@@ -124,8 +124,9 @@ class WhitelistLearner(QLearner):
 
     def get_noise(self, sq, sq_prime, shift):
         """Using learned noise distributions, return P(shift is not noise)."""
-        shift_prime = shift/np.sqrt(2)
-        return ((self.dist[sq](shift_prime) - .5) / .5) * ((self.dist[sq_prime](shift_prime) - .5) / .5)  # normalize on positive density
+        shift_prime = shift/(2 * np.sqrt(2))  # if noise, half of shift from each
+        return ((self.dist[sq](shift_prime) - .5) / .5) * \
+               ((self.dist[sq_prime](shift_prime) - .5) / .5)  # normalize on positive density
 
     def total_penalty(self, state_a, state_b):
         """Calculate the penalty incurred by the transition from state_a to state_b."""
@@ -136,8 +137,8 @@ class WhitelistLearner(QLearner):
     def penalty(self, sq, sq_prime, shift):
         """Using the whitelist average probability shifts, calculate penalty."""
         if sq == sq_prime or (sq, sq_prime) in self.whitelist: return 0
-        prob = self.get_noise(sq, sq_prime, shift)  # compensate for observational noise in this specific environment
-        return prob**5 * shift * self.unknown_cost
+        prob = max(0, self.get_noise(sq, sq_prime, shift))  # ECDF can return negative probs if less than half dist <= 0
+        return prob**3 * shift * self.unknown_cost
 
     def __str__(self):
         return "Whitelist"

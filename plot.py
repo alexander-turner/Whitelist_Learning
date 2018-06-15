@@ -22,7 +22,7 @@ if __name__ == '__main__':
 
     shifts = np.linspace(0, 1)
     for key, ECDF in agent.dist.items():
-        print(key, agent.posterior[key][1] / agent.posterior[key][0])  # var  TODO include
+        print(key, agent.posterior[key][1] / agent.posterior[key][0])  # var
         y = (ECDF(shifts/np.sqrt(2)) - .5) / .5  # normalize
         ax.plot(shifts, y, label=get_label(VaseWorld.chars.items(), key))
     y = (agent.prior(shifts/np.sqrt(2)) - .5) / .5  # prior
@@ -33,9 +33,9 @@ if __name__ == '__main__':
     plt.show()
 
     num_levels = 100
-    standard_deviations = (0, .001, .01, .025, .05, .075, .1, .125, .15, .175)  #
-    q_data = 74, 0  # None
-    whitelist_data = {0: (0, 0), .001: (0, 0), .01: (0, 0), .025: (0, 0), .05: (0, 0), .075: (0, 2)}  # 0 0 0 0 (start from .05)
+    standard_deviations = (0, .001, .01, .025, .05, .075, .1, .125, .15, .175)
+    q_data = None
+    whitelist_data = {}
 
     for sd in standard_deviations:
         print("Noise level: {}".format(sd))

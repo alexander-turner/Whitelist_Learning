@@ -28,7 +28,7 @@ def initialize(agent, sim, training=None, sd=.05):
     return agent(sim, training, sd=sd) if training is not None else agent(sim)
 
 
-def run(broken, failed, round, simulator=None, use_q_learner=False, do_render=True, sd=.1):
+def run(broken, failed, round, simulator=None, use_q_learner=False, do_render=True, sd=.15):
     """Run the given VaseWorld state for the specified learners."""
     if simulator is None:
         simulator = VaseWorld(height=randint(4, 5), width=randint(4, 5), obstacle_chance=(random() + 1) / 4)
