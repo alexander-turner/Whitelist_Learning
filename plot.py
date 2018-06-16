@@ -42,14 +42,12 @@ if __name__ == '__main__':
         broken, failed, round = MyCounter(), MyCounter([QLearner, WhitelistLearner]), MyCounter()
         failed[QLearner], failed[WhitelistLearner] = 0, 0
 
-        while round[0] < num_levels:
+        while round[0] < num_levels:  # TODO parallelize
             run(broken, failed, round, use_q_learner=sd == 0, do_render=False, sd=sd)
         if sd == 0:
             q_data = broken[QLearner], failed[QLearner]  # only generate for first noise condition
         whitelist_data[sd] = broken[WhitelistLearner], failed[WhitelistLearner]
         print()
-
-    print(q_data, whitelist_data)
 
     def set_up_plots():
         _, ax = plt.subplots()

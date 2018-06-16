@@ -138,7 +138,7 @@ class WhitelistLearner(QLearner):
         """Using the whitelist average probability shifts, calculate penalty."""
         if sq == sq_prime or (sq, sq_prime) in self.whitelist: return 0
         prob = max(0, self.get_noise(sq, sq_prime, shift))  # ECDF can return negative probs if less than half dist <= 0
-        return prob**3 * shift * self.unknown_cost
+        return prob**2 * shift * self.unknown_cost
 
     def __str__(self):
         return "Whitelist"
