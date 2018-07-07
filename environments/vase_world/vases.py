@@ -3,6 +3,7 @@ from random import choice as rchoice
 
 import numpy as np
 import pygame
+import time
 
 
 class VaseWorld:  # TODO use gridworlds
@@ -13,7 +14,7 @@ class VaseWorld:  # TODO use gridworlds
     obstacles = (chars['vase'], chars['crate'])
     input_chars = {'agent': 'A', 'goal': 'G'}  # only used for reading in custom levels
 
-    movement_cost = 1
+    movement_cost = .1
     goal_reward = 60
     agent_pos, goal_pos = None, None
     is_whitelist = False  # for rendering purposes
@@ -74,6 +75,33 @@ class VaseWorld:  # TODO use gridworlds
         self.agent_pos = self.original_agent_pos.copy()
         self.time_step = 0
 
+    def run(self, agent, learn=False, render=False):
+        def do_render(observation):
+            time.sleep(.01 if learn else .05)
+            self.render(observation)
+
+        # Shouldn't take more than w*h steps to complete - ensure whitelist isn't stuck behind obstacles
+        while (learn or self.time_step < self.num_squares) and not self.is_terminal():
+            #self.state[tuple(self.agent_pos)] = self.original_state[tuple(self.agent_pos)].copy()  # reset anything broken
+            self.state = self.original_state.copy()  # TODO just revert last square
+            old_observation = agent.observe_state(self.state)
+            if render: do_render(old_observation)
+
+            old_pos = tuple(self.agent_pos)
+            if learn:
+                action_idx = agent.behavior_action(old_pos)
+                agent.num_samples[action_idx][old_pos] += 1  # update sample count
+            else:
+                action_idx = agent.choose_action(self)
+
+            # broke_object used to speed training by reducing dimensionality - NOT for penalty
+            reward = self.take_action(agent.actions[action_idx]) - agent.total_penalty(old_observation,
+                                                                                       agent.observe_state(self.state))
+            if learn:
+                agent.update_greedy(old_pos, action_idx, reward, self.agent_pos)
+
+        if render and self.time_step > 0: do_render(old_observation)  # make sure we didn't start on goal
+
     @staticmethod
     def get_actions():
         return 'up', 'left', 'right', 'down', None
@@ -112,6 +140,7 @@ class VaseWorld:  # TODO use gridworlds
         self.update_agent_pos(old_pos, self.agent_pos)
 
         self.time_step += 1
+
         return self.get_reward() - (0 if action is None else self.movement_cost)
 
     def render(self, state):
